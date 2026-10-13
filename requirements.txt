@@ -1,3 +1,4 @@
-flask
-pymysql
+Flask
+PyMySQL
+cryptography
 gunicorn

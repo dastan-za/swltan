@@ -6,11 +6,9 @@ import os
 import re
 
 app = Flask(__name__)
-app.secret_key = 'shahoor_all_in_one_pos_2026'
-
+app.secret_key = 'shahoor_all_in_one_pos_2026_v10'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 
-# ڕێکخستنی فۆڵدەری ئەپلۆدکردنی وێنە
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -24,7 +22,7 @@ DB_CONFIG = {
     'port': 31707,
     'user': 'root',
     'password': 'HITVDFaMFehpQFmWrZlnaTKtavNtBZyw',
-    'database': 'nrx',
+    'database': 'railway',
     'charset': 'utf8mb4',
     'connect_timeout': 10,
     'cursorclass': pymysql.cursors.DictCursor
@@ -36,125 +34,48 @@ def get_db():
     return conn
 
 def normalize_digits(text):
-    if not text:
-        return ""
-    text = str(text).strip()
-    return text.translate(str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789'))
+    if not text: return ""
+    return str(text).strip().translate(str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789'))
 
+# ==========================================
+# 2. دروستکردنی خشتەکان (Database Tables)
+# ==========================================
 def ensure_all_tables():
     conn = None
     try:
         conn = get_db()
         with conn.cursor() as cursor:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    username VARCHAR(100) NOT NULL UNIQUE,
-                    password VARCHAR(100) NOT NULL,
-                    full_name VARCHAR(150) DEFAULT '',
-                    role VARCHAR(50) DEFAULT 'Waiter',
-                    can_view_menu TINYINT DEFAULT 1,
-                    can_view_tables TINYINT DEFAULT 1,
-                    can_view_cashier TINYINT DEFAULT 0,
-                    can_view_qsa TINYINT DEFAULT 0,
-                    can_view_reports TINYINT DEFAULT 0,
-                    can_view_settings TINYINT DEFAULT 0,
-                    is_active TINYINT DEFAULT 1
-                );
-            """)
+            cursor.execute("""CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL UNIQUE, password VARCHAR(100) NOT NULL, full_name VARCHAR(150) DEFAULT '', role VARCHAR(50) DEFAULT 'Waiter', can_view_menu TINYINT DEFAULT 1, can_view_tables TINYINT DEFAULT 1, can_view_cashier TINYINT DEFAULT 0, can_view_qsa TINYINT DEFAULT 0, can_view_reports TINYINT DEFAULT 0, can_view_settings TINYINT DEFAULT 0, is_active TINYINT DEFAULT 1);""")
+            cursor.execute("""CREATE TABLE IF NOT EXISTS nse (id INT AUTO_INCREMENT PRIMARY KEY, food_name VARCHAR(255) NOT NULL, price DECIMAL(18, 0) NOT NULL DEFAULT 0, category VARCHAR(150) DEFAULT 'گشتی', image_path TEXT, nsecol VARCHAR(50) DEFAULT '');""")
+            
+            try: cursor.execute("ALTER TABLE nse ADD COLUMN food_name_ar VARCHAR(255) DEFAULT '';")
+            except: pass
+            try: cursor.execute("ALTER TABLE nse ADD COLUMN food_name_en VARCHAR(255) DEFAULT '';")
+            except: pass
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS nse (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    food_name VARCHAR(255) NOT NULL,
-                    price DECIMAL(18, 0) NOT NULL DEFAULT 0,
-                    category VARCHAR(150) DEFAULT 'گشتی',
-                    image_path TEXT,
-                    nsecol VARCHAR(50) DEFAULT ''
-                );
-            """)
+            cursor.execute("""CREATE TABLE IF NOT EXISTS froshtn (order_id INT AUTO_INCREMENT PRIMARY KEY, quantity DECIMAL(10, 3) DEFAULT 1, food_name VARCHAR(255), price DECIMAL(18, 0), category VARCHAR(150), table_cabin VARCHAR(150), notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status VARCHAR(50) DEFAULT 'Active', is_printed TINYINT DEFAULT 0);""")
+            try: cursor.execute("ALTER TABLE froshtn MODIFY COLUMN quantity DECIMAL(10, 3) DEFAULT 1;")
+            except: pass
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS froshtn (
-                    order_id INT AUTO_INCREMENT PRIMARY KEY,
-                    quantity INT DEFAULT 1,
-                    food_name VARCHAR(255),
-                    price DECIMAL(18, 0),
-                    category VARCHAR(150),
-                    table_cabin VARCHAR(150),
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    status VARCHAR(50) DEFAULT 'Active',
-                    is_printed TINYINT DEFAULT 0
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS table_permissions (
-                    table_number INT PRIMARY KEY,
-                    allow_ordering TINYINT DEFAULT 1
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS workers (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(150) NOT NULL,
-                    phone VARCHAR(50) DEFAULT '',
-                    salary DECIMAL(18, 0) NOT NULL DEFAULT 0
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS worker_attendance (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    worker_id INT NOT NULL,
-                    date DATE NOT NULL,
-                    status VARCHAR(50) DEFAULT 'هاتوو',
-                    bonus DECIMAL(18, 0) DEFAULT 0,
-                    UNIQUE KEY uniq_worker_date (worker_id, date)
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS masrwf (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    masrwf_date DATETIME NOT NULL,
-                    masrwf_name VARCHAR(150) DEFAULT '',
-                    masrwf_type VARCHAR(100) NOT NULL,
-                    spent_by VARCHAR(100) DEFAULT '',
-                    amount DECIMAL(18, 0) NOT NULL,
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-
-            try:
-                cursor.execute("ALTER TABLE masrwf ADD COLUMN IF NOT EXISTS masrwf_name VARCHAR(150) DEFAULT '' AFTER masrwf_date;")
-                cursor.execute("ALTER TABLE masrwf ADD COLUMN IF NOT EXISTS spent_by VARCHAR(100) DEFAULT '' AFTER masrwf_type;")
-            except:
-                pass
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS qasa (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    transaction_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    place_id VARCHAR(150),
-                    amount DECIMAL(18, 0),
-                    discount DECIMAL(18, 0) DEFAULT 0
-                );
-            """)
-
+            cursor.execute("""CREATE TABLE IF NOT EXISTS table_permissions (table_number INT PRIMARY KEY, allow_ordering TINYINT DEFAULT 1);""")
+            cursor.execute("""CREATE TABLE IF NOT EXISTS workers (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(150) NOT NULL, phone VARCHAR(50) DEFAULT '', salary DECIMAL(18, 0) NOT NULL DEFAULT 0);""")
+            cursor.execute("""CREATE TABLE IF NOT EXISTS worker_attendance (id INT AUTO_INCREMENT PRIMARY KEY, worker_id INT NOT NULL, date DATE NOT NULL, status VARCHAR(50) DEFAULT 'هاتوو', bonus DECIMAL(18, 0) DEFAULT 0, UNIQUE KEY uniq_worker_date (worker_id, date));""")
+            cursor.execute("""CREATE TABLE IF NOT EXISTS masrwf (id INT AUTO_INCREMENT PRIMARY KEY, masrwf_date DATETIME NOT NULL, masrwf_name VARCHAR(150) DEFAULT '', masrwf_type VARCHAR(100) NOT NULL, spent_by VARCHAR(100) DEFAULT '', amount DECIMAL(18, 0) NOT NULL, payment_type VARCHAR(50) DEFAULT 'نەغد', notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);""")
+            
+            try: cursor.execute("ALTER TABLE masrwf ADD COLUMN masrwf_name VARCHAR(150) DEFAULT '';")
+            except: pass
+            try: cursor.execute("ALTER TABLE masrwf ADD COLUMN spent_by VARCHAR(100) DEFAULT '';")
+            except: pass
+            try: cursor.execute("ALTER TABLE masrwf ADD COLUMN payment_type VARCHAR(50) DEFAULT 'نەغد';")
+            except: pass
+            
+            cursor.execute("""CREATE TABLE IF NOT EXISTS qasa (id INT AUTO_INCREMENT PRIMARY KEY, transaction_time DATETIME DEFAULT CURRENT_TIMESTAMP, place_id VARCHAR(150), amount DECIMAL(18, 0), discount DECIMAL(18, 0) DEFAULT 0);""")
+            
             cursor.execute("SELECT id FROM users WHERE username = 'admin'")
             if not cursor.fetchone():
-                cursor.execute("""
-                    INSERT INTO users (username, password, full_name, role, is_active)
-                    VALUES ('admin', '1234', 'بەڕێوەبەری سەرەکی', 'Manager', 1)
-                """)
-
+                cursor.execute("INSERT INTO users (username, password, full_name, role, is_active) VALUES ('admin', '1234', 'بەڕێوەبەری سەرەکی', 'Manager', 1)")
         conn.commit()
-    except Exception as ex:
-        print("Setup tables error:", ex)
+    except Exception as ex: print("Setup tables error:", ex)
     finally:
         if conn:
             try: conn.close()
@@ -162,1060 +83,560 @@ def ensure_all_tables():
 
 ensure_all_tables()
 
+# ==========================================
+# 3. پاراستن (Security & Middleware)
+# ==========================================
 @app.before_request
 def enforce_security():
     endpoint = request.endpoint or ''
     exempt_endpoints = ['login', 'customer_table_view', 'save_customer_order', 'static', 'index']
-    if endpoint in exempt_endpoints:
+    if endpoint in exempt_endpoints or request.path.startswith(('/get_', '/save_', '/clear_', '/change_', '/set_', '/toggle_', '/api_')):
         return
-
-    is_api = request.path.startswith(('/get_', '/save_', '/clear_', '/change_', '/set_', '/toggle_', '/api_'))
-    if is_api:
-        return
-
     if not session.get('authenticated'):
         return redirect(url_for('login'))
-
     if request.path.startswith('/admin') and session.get('role') != 'admin':
         session.clear()
         return redirect(url_for('login'))
 
 # ==========================================
-# پەڕەی چوونەژوورەوە
+# 4. بەشی دیزاینی هاوبەش (Common HTML/CSS/JS)
 # ==========================================
-LOGIN_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="ckb" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>چوونەژوورەوە - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background: #03261d; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
-        .login-card { background: #064032; border: 1.5px solid #0b5e4a; padding: 36px 28px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.5); }
-        .brand-title { color: #10b981; font-size: 26px; font-weight: 800; margin-bottom: 6px; }
-        .brand-sub { color: #a7f3d0; font-size: 13px; margin-bottom: 24px; }
-        .input-group { text-align: right; margin-bottom: 16px; }
-        .input-group label { display: block; font-size: 12px; font-weight: 700; color: #a7f3d0; margin-bottom: 6px; }
-        .login-input { width: 100%; padding: 13px 14px; background: #03261d; border: 2px solid #0b5e4a; border-radius: 12px; color: #10b981; font-size: 16px; font-weight: 700; outline: none; }
-        .login-input:focus { border-color: #10b981; }
-        .btn-submit { width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; border: none; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 10px; }
-        .error-msg { color: #ef4444; font-size: 13px; margin-top: 14px; font-weight: 700; }
-        .quick-hint { margin-top: 20px; font-size: 11px; color: #94a3b8; border-top: 1px solid #0b5e4a; padding-top: 14px; }
-    </style>
-</head>
-<body>
-    <div class="login-card">
-        <div class="brand-title">✨ دیوانی سوڵتان ڕێستۆرانت</div>
-        <div class="brand-sub">تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە</div>
-        <form method="POST" action="/login">
-            <div class="input-group">
-                <label>ناوی بەکارهێنەر (Username):</label>
-                <input type="text" name="username" class="login-input" autofocus>
-            </div>
-            <div class="input-group">
-                <label>وشەی نهێنی (Password):</label>
-                <input type="password" name="password" class="login-input">
-            </div>
-            <button type="submit" class="btn-submit">چوونەژوورەوە ➔</button>
-        </form>
-        {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
-        <div class="quick-hint">
-            👑 بەڕێوەبەر: admin / 1234 | بەتاڵ جێی بهێڵە بۆ گارسۆن
-        </div>
-    </div>
-</body>
-</html>
+COMMON_HEAD = """
+<link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+    :root { --bg: #0B0F19; --card: #151D30; --primary: #F59E0B; --accent: #10B981; --danger: #EF4444; --text: #F8FAFC; --border: #1E293B; }
+    [data-theme="blue"] { --bg: #0f172a; --card: #1e293b; --primary: #3b82f6; --accent: #06b6d4; --border: #334155; }
+    [data-theme="green"] { --bg: #064e3b; --card: #065f46; --primary: #10b981; --accent: #f59e0b; --border: #047857; }
+    [data-theme="purple"] { --bg: #2e1065; --card: #4c1d95; --primary: #a855f7; --accent: #f472b6; --border: #5b21b6; }
+    [data-theme="darkred"] { --bg: #2a0808; --card: #450a0a; --primary: #fca5a5; --accent: #f87171; --border: #7f1d1d; }
+    [data-theme="gold"] { --bg: #1c1400; --card: #382700; --primary: #fbbf24; --accent: #f59e0b; --border: #78350f; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; transition: background 0.3s, border-color 0.3s; }
+</style>
+<script>
+    window.savedTheme = localStorage.getItem('theme') || 'luxury';
+    document.documentElement.setAttribute('data-theme', window.savedTheme);
+    window.savedLang = localStorage.getItem('lang') || 'ku';
+    document.documentElement.dir = window.savedLang === 'en' ? 'ltr' : 'rtl';
+
+    const DICT = {
+        'ku': { 'dashboard': 'داشبۆرد', 'logout': 'دەرچوون', 'pos': 'فرۆشتن', 'cashier': 'کاشێر', 'reports': 'ئامار', 'expenses': 'مەسرووفات', 'workers': 'شاگرد', 'menu': 'مێنیو', 'users': 'بەکارهێنەر', 'qr': 'بارکۆد', 'cart': 'سەبەتە', 'send': 'ناردن', 'all': 'هەموو' },
+        'ar': { 'dashboard': 'لوحة القيادة', 'logout': 'خروج', 'pos': 'نقطة البيع', 'cashier': 'الكاشير', 'reports': 'التقارير', 'expenses': 'المصروفات', 'workers': 'العمال', 'menu': 'القائمة', 'users': 'المستخدمين', 'qr': 'باركود', 'cart': 'السلة', 'send': 'إرسال', 'all': 'الكل' },
+        'en': { 'dashboard': 'Dashboard', 'logout': 'Logout', 'pos': 'POS', 'cashier': 'Cashier', 'reports': 'Reports', 'expenses': 'Expenses', 'workers': 'Staff', 'menu': 'Menu', 'users': 'Users', 'qr': 'QR Codes', 'cart': 'Cart', 'send': 'Send', 'all': 'All' }
+    };
+
+    function updateGlobalLanguage() {
+        document.querySelectorAll('[data-tr]').forEach(el => {
+            let k = el.getAttribute('data-tr');
+            if(DICT[window.savedLang] && DICT[window.savedLang][k]) el.innerText = DICT[window.savedLang][k];
+        });
+        window.dispatchEvent(new Event('langChanged'));
+    }
+
+    document.addEventListener('DOMContentLoaded', updateGlobalLanguage);
+
+    function setLang(l) {
+        localStorage.setItem('lang', l);
+        window.savedLang = l;
+        document.documentElement.dir = (l==='en') ? 'ltr' : 'rtl';
+        updateGlobalLanguage();
+    }
+
+    function setTheme(t) {
+        localStorage.setItem('theme', t);
+        window.savedTheme = t;
+        document.documentElement.setAttribute('data-theme', t);
+    }
+</script>
 """
 
 # ==========================================
-# داشبۆردی بەڕێوەبەر
+# 5. پەڕەکانی HTML (Templates)
 # ==========================================
-ADMIN_DASHBOARD_TEMPLATE = """
+
+# ----------------- Login -----------------
+LOGIN_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>داشبۆردی سەرەکی - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>چوونەژوورەوە</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #03261d; color: #ffffff; min-height: 100vh; display: flex; flex-direction: column; }
-        .admin-nav { background: #064032; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0b5e4a; }
-        .admin-brand { font-size: 20px; font-weight: 800; color: #10b981; }
-        .btn-exit { background: #ef4444; color: #fff; text-decoration: none; padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 13px; }
-        .admin-content { flex: 1; padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+        body { background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .settings-bar { position: absolute; top: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .color-picker, .lang-picker { display: flex; gap: 8px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 12px; border: 1px solid var(--border); }
+        .color-circle { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .color-circle.active { border-color: #fff; transform: scale(1.1); }
+        .lang-btn { background: transparent; color: #fff; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .lang-btn.active { background: var(--primary); color: #000; }
+        .login-card { background: var(--card); border: 1px solid var(--border); padding: 40px 30px; border-radius: 24px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); position: relative; }
+        .brand-title { color: var(--primary); font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+        .brand-sub { color: #94A3B8; font-size: 13px; margin-bottom: 30px; }
+        .input-group { text-align: start; margin-bottom: 16px; }
+        .input-group label { display: block; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; }
+        .login-input { width: 100%; padding: 14px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-size: 15px; outline: none; }
+        .login-input:focus { border-color: var(--primary); }
+        .btn-submit { width: 100%; background: var(--primary); color: #000; border: none; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 10px; }
+        .error-msg { color: #ef4444; font-size: 13px; margin-top: 14px; font-weight: 700; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="settings-bar">
+        <div class="color-picker">
+            <div class="color-circle" id="theme-luxury" style="background:#F59E0B;" onclick="changeTheme('luxury', this)"></div>
+            <div class="color-circle" id="theme-gold" style="background:#fbbf24;" onclick="changeTheme('gold', this)"></div>
+            <div class="color-circle" id="theme-darkred" style="background:#ef4444;" onclick="changeTheme('darkred', this)"></div>
+            <div class="color-circle" id="theme-blue" style="background:#3b82f6;" onclick="changeTheme('blue', this)"></div>
+            <div class="color-circle" id="theme-green" style="background:#10b981;" onclick="changeTheme('green', this)"></div>
+            <div class="color-circle" id="theme-purple" style="background:#a855f7;" onclick="changeTheme('purple', this)"></div>
+        </div>
+        <div class="lang-picker">
+            <button class="lang-btn" id="lang-ku" onclick="changeLang('ku', this)">KU</button>
+            <button class="lang-btn" id="lang-ar" onclick="changeLang('ar', this)">AR</button>
+            <button class="lang-btn" id="lang-en" onclick="changeLang('en', this)">EN</button>
+        </div>
+    </div>
+    <div class="login-card">
+        <div class="brand-title" id="t_title">✨ چێشتماڵە</div>
+        <div class="brand-sub" id="t_sub">تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە</div>
+        <form method="POST" action="/login">
+            <div class="input-group"><label id="t_lbl_u">ناوی بەکارهێنەر</label><input type="text" name="username" class="login-input" autofocus></div>
+            <div class="input-group"><label id="t_lbl_p">وشەی نهێنی</label><input type="password" name="password" class="login-input"></div>
+            <button type="submit" class="btn-submit" id="t_btn">چوونەژوورەوە ➔</button>
+        </form>
+        {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
+    </div>
+    <script>
+        const langDictL = {
+            'ku': { 'title': '✨ چێشتماڵە', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
+            'ar': { 'title': '✨ جيشتمالة', 'sub': 'يرجى إدخال اسم المستخدم وكلمة المرور', 'lbl_u': 'اسم المستخدم', 'lbl_p': 'كلمة المرور', 'btn': 'تسجيل الدخول ➔' },
+            'en': { 'title': '✨ Cheshtmala', 'sub': 'Please enter your username and password', 'lbl_u': 'Username', 'lbl_p': 'Password', 'btn': 'Login ➔' }
+        };
         
-        .stats-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
-        .stat-card { background: #064032; border: 1.5px solid #0b5e4a; border-radius: 16px; padding: 20px; display: flex; align-items: center; justify-content: space-between; }
-        .stat-info { display: flex; flex-direction: column; gap: 6px; }
-        .stat-label { font-size: 13px; font-weight: 700; color: #a7f3d0; }
-        .stat-value { font-size: 21px; font-weight: 800; }
+        let themeEl = document.getElementById('theme-' + window.savedTheme);
+        if(themeEl) themeEl.classList.add('active');
         
-        .section-header { font-size: 18px; font-weight: 800; color: #10b981; margin-bottom: 16px; border-bottom: 1px solid #0b5e4a; padding-bottom: 8px; }
-        .dashboard-modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
-        .module-card { background: #ffffff; border-radius: 18px; padding: 22px; text-decoration: none; color: #0f172a; display: flex; flex-direction: column; gap: 10px; transition: transform 0.2s; }
-        .module-card:hover { transform: translateY(-4px); }
+        let langEl = document.getElementById('lang-' + window.savedLang);
+        if(langEl) langEl.classList.add('active');
+        
+        applyL(window.savedLang);
+
+        function applyL(l) {
+            document.getElementById('t_title').innerText = langDictL[l].title;
+            document.getElementById('t_sub').innerText = langDictL[l].sub;
+            document.getElementById('t_lbl_u').innerText = langDictL[l].lbl_u;
+            document.getElementById('t_lbl_p').innerText = langDictL[l].lbl_p;
+            document.getElementById('t_btn').innerText = langDictL[l].btn;
+        }
+
+        window.addEventListener('langChanged', () => applyL(window.savedLang));
+
+        function changeLang(l, btn) {
+            document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            setLang(l);
+        }
+        function changeTheme(t, btn) {
+            document.querySelectorAll('.color-circle').forEach(b=>b.classList.remove('active')); 
+            btn.classList.add('active');
+            setTheme(t);
+        }
+    </script>
+</body>
+</html>
+"""
+
+# ----------------- Admin Dashboard -----------------
+ADMIN_DASHBOARD_TEMPLATE = COMMON_HEAD + """
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبۆردی سەرەکی</title>
+    <style>
+        body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+        .admin-nav { background: var(--card); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .admin-brand { font-size: 20px; font-weight: 800; color: var(--primary); }
+        .btn-exit { background: var(--danger); color: #fff; text-decoration: none; padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 13px; }
+        .admin-content { flex: 1; padding: 30px 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 32px; }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: flex; align-items: center; justify-content: space-between; }
+        .stat-info { display: flex; flex-direction: column; gap: 8px; }
+        .stat-label { font-size: 13px; font-weight: 700; color: #94A3B8; }
+        .stat-value { font-size: 24px; font-weight: 800; }
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .module-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; text-decoration: none; color: var(--text); display: flex; flex-direction: column; gap: 12px; transition: 0.2s; }
+        .module-card:hover { border-color: var(--primary); transform: translateY(-3px); }
         .module-top { display: flex; align-items: center; justify-content: space-between; }
-        .module-icon { font-size: 30px; background: #f1f5f9; width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; border-radius: 14px; }
-        .module-badge { background: #10b981; color: #03261d; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 10px; }
-        .module-title { font-size: 17px; font-weight: 800; }
-        .module-desc { font-size: 12.5px; color: #64748b; font-weight: 600; line-height: 1.4; }
+        .module-icon { font-size: 32px; }
+        .module-badge { background: var(--accent); color: #000; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 8px; }
+        .module-title { font-size: 16px; font-weight: 800; color: var(--primary); }
     </style>
 </head>
 <body>
     <header class="admin-nav">
-        <div class="admin-brand">✨ دیوانی سوڵتان ڕێستۆرانت - داشبۆردی بەڕێوەبەر</div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="color:#a7f3d0; font-size:13px; font-weight:700;">👑 {{ session.get('full_name', 'بەڕێوەبەر') }}</span>
-            <a href="/logout" class="btn-exit">✕ دەرچوون</a>
+        <div class="admin-brand" data-tr="dashboard">✨ چێشتماڵە - داشبۆرد</div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="color:#cbd5e1; font-size:13px; font-weight:700;">👑 {{ session.get('full_name', 'بەڕێوەبەر') }}</span>
+            <a href="/logout" class="btn-exit" data-tr="logout">✕ دەرچوون</a>
         </div>
     </header>
-
     <main class="admin-content">
-        <div class="stats-cards-grid">
-            <div class="stat-card">
-                <div class="stat-info">
-                    <span class="stat-label">💰 فرۆشی ٢٤ کاتژمێر</span>
-                    <span class="stat-value" style="color: #10b981;">{{ "{:,.0f}".format(today_sales) }} د.ع</span>
-                </div>
-                <div style="font-size: 36px;">📈</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-info">
-                    <span class="stat-label">💸 مەسرووفی ئەمڕۆ</span>
-                    <span class="stat-value" style="color: #ef4444;">{{ "{:,.0f}".format(today_expense) }} د.ع</span>
-                </div>
-                <div style="font-size: 36px;">🧾</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-info">
-                    <span class="stat-label">🛎️ مێزە کراوەکان</span>
-                    <span class="stat-value" style="color: #f59e0b;">{{ active_tables_count }} مێز</span>
-                </div>
-                <div style="font-size: 36px;">🍽️</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-info">
-                    <span class="stat-label">👥 ژمارەی شاگرد</span>
-                    <span class="stat-value" style="color: #38bdf8;">{{ total_workers }} شاگرد</span>
-                </div>
-                <div style="font-size: 36px;">👤</div>
-            </div>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-info"><span class="stat-label">💰 فرۆشی ئەمڕۆ</span><span class="stat-value" style="color: var(--accent);">{{ "{:,.0f}".format(today_sales) }} د.ع</span></div><div class="module-icon">📈</div></div>
+            <div class="stat-card"><div class="stat-info"><span class="stat-label">💸 مەسرووفی ئەمڕۆ</span><span class="stat-value" style="color: var(--danger);">{{ "{:,.0f}".format(today_expense) }} د.ع</span></div><div class="module-icon">🧾</div></div>
+            <div class="stat-card"><div class="stat-info"><span class="stat-label">🛎️ مێزە کراوەکان</span><span class="stat-value" style="color: var(--primary);">{{ active_tables_count }} مێز</span></div><div class="module-icon">🍽️</div></div>
+            <div class="stat-card"><div class="stat-info"><span class="stat-label">👥 ژمارەی شاگرد</span><span class="stat-value" style="color: #38bdf8;">{{ total_workers }} شاگرد</span></div><div class="module-icon">👤</div></div>
         </div>
 
-        <div class="section-header">📁 بەشە کارگێڕییەکانی سیستەم</div>
-        <div class="dashboard-modules-grid">
-            <a href="/admin/amar" class="module-card" style="border: 2px solid #f59e0b;">
-                <div class="module-top"><div class="module-icon">📊</div><span class="module-badge" style="background:#f59e0b; color:#fff;">سەربەخۆ</span></div>
-                <div class="module-title">ئامار و قازانج (ڕاپۆرت)</div>
-                <div class="module-desc">ڕاپۆرتی فرۆش، کۆی مەسرووفات بەپێی بەروار، کرێی شاگرد و قازانجی صافی.</div>
-            </a>
-
-            <a href="/admin/cashier" class="module-card" style="border: 2px solid #10b981;">
-                <div class="module-top"><div class="module-icon">🛎️</div><span class="module-badge">کاشێر</span></div>
-                <div class="module-title">کاشێر و واصڵکردن</div>
-                <div class="module-desc">شاشەی مێزە داواکراوەکان، دوگمەی +٥٠٠ و -٥٠٠، و چاپی وەسڵی ٨٠مم.</div>
-            </a>
-
-            <a href="/admin/users" class="module-card">
-                <div class="module-top"><div class="module-icon">🔐</div><span class="module-badge">بەکارهێنەر</span></div>
-                <div class="module-title">بەکارهێنەران و دەسەڵاتەکان</div>
-                <div class="module-desc">دانانی ناوی بەکارهێنەر و وشەی نهێنی، دەستکاری، بلۆککردن، سڕینەوە.</div>
-            </a>
-
-            <a href="/admin/qasa" class="module-card">
-                <div class="module-top"><div class="module-icon">💵</div><span class="module-badge">قاسە</span></div>
-                <div class="module-title">قاسەی فرۆشتن (٢٤ کاتژمێر)</div>
-                <div class="module-desc">بینینی تەواوی پسولە واصڵکراوەکان، کۆی داهات، داشکاندن و کاتی وەسڵەکان.</div>
-            </a>
-
-            <a href="/admin/masrwf" class="module-card" style="border: 2px solid #ef4444;">
-                <div class="module-top"><div class="module-icon">🧾</div><span class="module-badge" style="background:#ef4444; color:#fff;">مەسرووف</span></div>
-                <div class="module-title">مەسرووفات و خەرجییەکان</div>
-                <div class="module-desc">تۆمارکردنی جۆری مەسرووف، خەرجکەر بە شێوازی فۆڕمی سی شارپ.</div>
-            </a>
-
-            <a href="/admin/workers" class="module-card">
-                <div class="module-top"><div class="module-icon">👥</div><span class="module-badge">شاگرد</span></div>
-                <div class="module-title">حیساباتی شاگردەکان</div>
-                <div class="module-desc">ئامادەبوونی ڕۆژانە، فلتەری ماوە، بەخشش و حیسابی شایستە بە دیزاینی نوێ.</div>
-            </a>
-
-            <a href="/admin/menu_manager" class="module-card">
-                <div class="module-top"><div class="module-icon">📖</div><span class="module-badge">مێنۆ</span></div>
-                <div class="module-title">بەڕێوەبردنی خواردنەکان</div>
-                <div class="module-desc">زیادکردنی خواردنی نوێ، کۆمبۆبۆکسی پۆلێن، و ئەپلۆدکردنی وێنە ڕاستەوخۆ.</div>
-            </a>
-
-            <a href="/desktop/tables" class="module-card">
-                <div class="module-top"><div class="module-icon">🍽️</div><span class="module-badge">ئایپاد</span></div>
-                <div class="module-title">مێزەکان و گارسۆن (ئایپاد)</div>
-                <div class="module-desc">شاشەی مێزەکان، ئۆردەری خواردن و گواستنەوەی مێز.</div>
-            </a>
-
-            <a href="/mobile/tables" class="module-card">
-                <div class="module-top"><div class="module-icon">📱</div><span class="module-badge">مۆبایل</span></div>
-                <div class="module-title">مێزەکانی مۆبایل</div>
-                <div class="module-desc">شاشەی ئۆردەرکردنی خواردن تایبەت بە مۆبایل.</div>
-            </a>
-
-            <a href="/qr_manager" class="module-card">
-                <div class="module-top"><div class="module-icon">🖨️</div><span class="module-badge">QR</span></div>
-                <div class="module-title">بەڕێوەبردنی QR مێزەکان</div>
-                <div class="module-desc">چاپی ٩٠ کیوئاڕ کۆدەکە لەگەڵ دیاریکردنی مۆڵەتی ئۆردەر.</div>
-            </a>
+        <div class="modules-grid">
+            <a href="/admin/amar" class="module-card"><div class="module-top"><div class="module-icon">📊</div><span class="module-badge" style="background:var(--primary);">VIP</span></div><div class="module-title" data-tr="reports">ئامار و قازانج</div></a>
+            <a href="/admin/cashier" class="module-card"><div class="module-top"><div class="module-icon">🛎️</div><span class="module-badge">#1</span></div><div class="module-title" data-tr="cashier">کاشێر و واصڵکردن</div></a>
+            <a href="/admin/qasa" class="module-card"><div class="module-top"><div class="module-icon">💵</div><span class="module-badge">#2</span></div><div class="module-title">قاسەی فرۆشتن</div></a>
+            <a href="/admin/masrwf" class="module-card"><div class="module-top"><div class="module-icon">🧾</div><span class="module-badge" style="background:var(--danger);color:#fff;">$</span></div><div class="module-title" data-tr="expenses">مەسرووفات</div></a>
+            <a href="/admin/workers" class="module-card"><div class="module-top"><div class="module-icon">👥</div><span class="module-badge" style="background:#3b82f6;color:#fff;">HR</span></div><div class="module-title" data-tr="workers">حیساباتی شاگردان</div></a>
+            <a href="/admin/menu_manager" class="module-card"><div class="module-top"><div class="module-icon">📖</div><span class="module-badge" style="background:#a855f7;color:#fff;">+</span></div><div class="module-title" data-tr="menu">بەڕێوەبردنی مێنیو</div></a>
+            <a href="/desktop/tables" class="module-card"><div class="module-top"><div class="module-icon">🖥️</div><span class="module-badge">PC</span></div><div class="module-title" data-tr="pos">شاشەی ئایپاد / شاشەگەورە</div></a>
+            <a href="/mobile/tables" class="module-card"><div class="module-top"><div class="module-icon">📱</div><span class="module-badge">MOB</span></div><div class="module-title">مێزەکانی مۆبایل</div></a>
+            <a href="/admin/users" class="module-card"><div class="module-top"><div class="module-icon">🔐</div><span class="module-badge" style="background:#64748b;color:#fff;">SEC</span></div><div class="module-title" data-tr="users">بەکارهێنەران</div></a>
+            <a href="/qr_manager" class="module-card"><div class="module-top"><div class="module-icon">🖨️</div><span class="module-badge">QR</span></div><div class="module-title" data-tr="qr">بەڕێوەبردنی QR</div></a>
         </div>
     </main>
 </body>
 </html>
 """
 
-# ==========================================
-# پەڕەی ئامار و قازانج (مۆدێرن و داینامیکی)
-# ==========================================
-WEB_AMAR_TEMPLATE = """
+# ----------------- Amar -----------------
+WEB_AMAR_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ئامار و قازانج - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>ئامار</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #0f172a; color: #ffffff; min-height: 100vh; padding: 20px; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 14px 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; }
-        .btn-dash { background: #334155; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 13px; }
-        .btn-print { background: #d97706; color: #fff; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer; }
-
-        .filter-card { background: #1e293b; border: 1.5px solid #334155; border-radius: 14px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .filter-form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
-        .filter-item { display: flex; flex-direction: column; gap: 6px; }
-        .filter-item label { font-size: 13px; font-weight: 700; color: #38bdf8; }
-        .date-input-wrap { position: relative; display: flex; align-items: center; }
-        .date-input-wrap input[type="date"] { background: #0f172a; border: 1.5px solid #475569; border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 14px; font-weight: 700; outline: none; cursor: pointer; color-scheme: dark; }
-        .date-input-wrap input[type="date"]:focus { border-color: #10b981; }
-        .btn-search { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 11px 24px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 14px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
-        .btn-search:hover { opacity: 0.9; }
-
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 14px 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .btn-dash { background: var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; }
+        .filter-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 20px; display:flex; gap:10px; }
+        .date-input { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: #fff; outline: none; }
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
-        .sum-card { background: #1e293b; border: 1.5px solid #334155; border-radius: 14px; padding: 18px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .sum-label { font-size: 13px; color: #94a3b8; font-weight: 700; margin-bottom: 8px; }
-        .sum-val { font-size: 20px; font-weight: 900; }
-
-        .table-responsive { overflow-x: auto; background: #1e293b; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; text-align: center; }
-        th { background: #d97706; padding: 14px; color: #fff; font-size: 13.5px; font-weight: 800; border-bottom: 1px solid #334155; }
-        td { padding: 12px; border-bottom: 1px solid #334155; font-size: 13px; }
-        tr:nth-child(even) { background: #162032; }
-
-        .print-only-header, .print-only-footer { display: none; }
-
-        @media print {
-            body { background: #fff !important; color: #000 !important; padding: 10mm !important; }
-            .top-bar, .filter-card, .btn-print, .btn-dash, .summary-grid { display: none !important; }
-            .print-only-header { display: block !important; text-align: center; margin-bottom: 15px; }
-            .print-only-header h2 { font-size: 18px; color: #d97706 !important; margin-bottom: 4px; }
-            .print-only-header p { font-size: 12px; color: #333; margin-bottom: 10px; }
-            .print-divider { border-top: 2px solid #d97706; margin-bottom: 15px; }
-            .table-responsive { background: #fff !important; border: 1px solid #000 !important; }
-            table { border: 1px solid #000 !important; }
-            th { background: #e2e8f0 !important; color: #000 !important; border: 1px solid #000 !important; font-size: 11px; }
-            td { color: #000 !important; border: 1px solid #000 !important; font-size: 11px; padding: 6px; }
-            tr:nth-child(even) { background: #fff !important; }
-            .print-only-footer { display: block !important; margin-top: 15px; border: 1px solid #000; background: #f8fafc; padding: 12px; border-radius: 6px; }
-            .print-footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; font-weight: bold; }
-        }
+        .sum-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; text-align: center; }
+        .sum-val { font-size: 20px; font-weight: 900; margin-top:5px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; background: var(--card); border: 1px solid var(--border); }
+        th { background: rgba(0,0,0,0.2); padding: 14px; color: var(--primary); border-bottom: 1px solid var(--border); }
+        td { padding: 12px; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <h2 style="color:#f59e0b;">📊 ڕاپۆرتی گشتی فرۆش، مەسرووف و قازانج</h2>
-        <div style="display:flex; gap:8px;">
-            <button type="button" class="btn-print" onclick="window.print()">🖨️ چاپی ڕاپۆرت (A4)</button>
-            <a href="/admin" class="btn-dash">⬅️ داشبۆرد</a>
-        </div>
+        <h2 style="color:var(--primary); font-size: 18px;" data-tr="reports">📊 ڕاپۆرتی ئامار و قازانج</h2>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅️ داشبۆرد</a>
     </div>
-
-    <div class="print-only-header">
-        <h2>✨ دیوانی سوڵتان ڕێستۆرانت - ڕاپۆرتی گشتی فرۆش و دارایی</h2>
-        <p>ماوەی دیاریکراو: لە [{{ start_date }}] تا [{{ end_date }}]</p>
-        <div class="print-divider"></div>
-    </div>
-
-    <div class="filter-card">
-        <form method="GET" action="/admin/amar" class="filter-form">
-            <div class="filter-item">
-                <label>📅 لە بەرواری:</label>
-                <div class="date-input-wrap">
-                    <input type="date" name="start_date" value="{{ start_date }}" required>
-                </div>
-            </div>
-            <div class="filter-item">
-                <label>📅 تا بەرواری:</label>
-                <div class="date-input-wrap">
-                    <input type="date" name="end_date" value="{{ end_date }}" required>
-                </div>
-            </div>
-            <button type="submit" class="btn-search">🔍 فلتەر و حیسابکردن</button>
-        </form>
-    </div>
-
+    <form method="GET" action="/admin/amar" class="filter-card">
+        <input type="date" name="start_date" class="date-input" value="{{ start_date }}" required>
+        <input type="date" name="end_date" class="date-input" value="{{ end_date }}" required>
+        <button type="submit" style="background:var(--accent); color:#000; border:none; padding:10px 20px; border-radius:8px; font-weight:bold;">فلتەر</button>
+    </form>
     <div class="summary-grid">
-        <div class="sum-card">
-            <div class="sum-label">💰 کۆی فرۆشی ماوەکە</div>
-            <div class="sum-val" style="color: #10b981;">{{ "{:,.0f}".format(total_sales) }} د.ع</div>
-        </div>
-        <div class="sum-card">
-            <div class="sum-label">💸 کۆی مەسرووفاتی ماوەکە</div>
-            <div class="sum-val" style="color: #ef4444;">{{ "{:,.0f}".format(total_expenses) }} د.ع</div>
-        </div>
-        <div class="sum-card">
-            <div class="sum-label">👥 کرێی شاگرد لە ماوەکەدا</div>
-            <div class="sum-val" style="color: #f59e0b;">{{ "{:,.0f}".format(total_workers_wage) }} د.ع</div>
-        </div>
-        <div class="sum-card">
-            <div class="sum-label">🧾 کۆی هەموو خەرجییەکان</div>
-            <div class="sum-val" style="color: #e2e8f0;">{{ "{:,.0f}".format(total_all_expenses) }} د.ع</div>
-        </div>
-        <div class="sum-card">
-            <div class="sum-label">✨ قازانجی سافی (بڕی ماوە)</div>
-            <div class="sum-val" style="color: {{ '#10b981' if net_profit >= 0 else '#ef4444' }};">
-                {{ "{:,.0f}".format(net_profit) }} د.ع
-            </div>
-        </div>
-        <div class="sum-card">
-            <div class="sum-label">🍽️ کۆی ژمارەی خواردن</div>
-            <div class="sum-val" style="color: #38bdf8;">{{ "{:,.0f}".format(total_items_count) }} دانە</div>
-        </div>
+        <div class="sum-card"><div>کۆی فرۆش</div><div class="sum-val" style="color: var(--accent);">{{ "{:,.0f}".format(total_sales) }}</div></div>
+        <div class="sum-card"><div>کۆی مەسرووف</div><div class="sum-val" style="color: var(--danger);">{{ "{:,.0f}".format(total_expenses) }}</div></div>
+        <div class="sum-card"><div>کرێی شاگرد</div><div class="sum-val" style="color: #3b82f6;">{{ "{:,.0f}".format(total_workers_wage) }}</div></div>
+        <div class="sum-card"><div>قازانجی سافی</div><div class="sum-val" style="color: {{ 'var(--accent)' if net_profit >= 0 else 'var(--danger)' }};">{{ "{:,.0f}".format(net_profit) }}</div></div>
     </div>
-
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 70px;">ڕیزبەندی</th>
-                    <th style="text-align:right;">ناوی خواردن / خواردنەوە</th>
-                    <th>کۆی ژمارەی فرۆشراو</th>
-                    <th>نرخی تاک</th>
-                    <th>کۆی داهات (دینار)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in report_rows %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td style="text-align:right; font-weight:700;">{{ r.food_name }}</td>
-                    <td style="color:#38bdf8; font-weight:800;">{{ "{:,.0f}".format(r.qty) }}</td>
-                    <td>{{ "{:,.0f}".format(r.price) }} د.ع</td>
-                    <td style="color:#10b981; font-weight:800;">{{ "{:,.0f}".format(r.total) }} د.ع</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" style="padding:30px; color:#94a3b8;">هیچ فرۆشێک لەم ماوەیەدا تۆمار نەکراوە</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <div class="print-only-footer">
-        <div class="print-footer-grid">
-            <div>کۆی گشتی ژمارەی خواردن: {{ "{:,.0f}".format(total_items_count) }} دانە</div>
-            <div style="color: darkgreen;">کۆی گشتی فرۆش: {{ "{:,.0f}".format(total_sales) }} دینار</div>
-            <div style="color: darkred;">کۆی خەرجی مەسرووف: {{ "{:,.0f}".format(total_expenses) }} دینار</div>
-            <div style="color: darkred;">کۆی کرێی شاگردەکان: {{ "{:,.0f}".format(total_workers_wage) }} دینار</div>
-            <div>کۆی هەموو خەرجییەکان: {{ "{:,.0f}".format(total_all_expenses) }} دینار</div>
-            <div style="font-size: 13px; color: {{ 'darkgreen' if net_profit >= 0 else 'red' }};">
-                قازانجی سافی (بڕی ماوە): {{ "{:,.0f}".format(net_profit) }} دینار
-            </div>
-        </div>
-    </div>
+    <table>
+        <thead><tr><th>ناوی خواردن</th><th>ژمارە</th><th>کۆی داهات</th></tr></thead>
+        <tbody>
+            {% for r in report_rows %}
+            <tr><td>{{ r.food_name }}</td><td>{{ "{:,.2f}".format(r.qty).rstrip('0').rstrip('.') }}</td><td style="color:var(--accent); font-weight:bold;">{{ "{:,.0f}".format(r.total) }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>
 """
 
-WEB_MASRWF_TEMPLATE = """
+# ----------------- Masrwfat -----------------
+WEB_MASRWF_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مەسرووفات و خەرجییەکان - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>مەسرووفات</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
-
-        .header-panel { background-color: #1e293b; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 2px solid #334155; }
-        .header-title { font-size: 18px; font-weight: 800; color: #f59e0b; display: flex; align-items: center; gap: 10px; }
-        .btn-dash { background: #334155; color: #ffffff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 13px; }
-
-        .masrwf-layout { display: grid; grid-template-columns: 1fr 400px; flex: 1; min-height: calc(100vh - 64px); background: #0f172a; }
-
-        .grid-area { padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
-        
-        .filter-bar { background: #1e293b; border: 1.5px solid #334155; border-radius: 14px; padding: 12px 20px; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .filter-item { display: flex; flex-direction: column; gap: 6px; }
-        .filter-item label { font-size: 12px; font-weight: 700; color: #38bdf8; }
-        
-        .date-input-wrap { position: relative; display: flex; align-items: center; }
-        .date-input-wrap input[type="date"] { background: #0f172a; border: 1.5px solid #475569; border-radius: 8px; padding: 6px 10px; color: #fff; font-size: 13px; font-weight: 700; outline: none; cursor: pointer; color-scheme: dark; width: 140px; }
-        .date-input-wrap input[type="date"]:focus { border-color: #10b981; }
-
-        .btn-icon-only { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 20px; cursor: pointer; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-decoration: none; transition: 0.2s; }
-        .btn-icon-only:hover { opacity: 0.8; transform: scale(1.05); }
-        
-        .summary-badges { display: flex; gap: 12px; }
-        .summary-box { background: #0f172a; border-radius: 10px; padding: 8px 16px; text-align: center; border: 1.5px solid; min-width: 120px; }
-        .summary-box-title { font-size: 11px; font-weight: 800; margin-bottom: 2px; }
-        .summary-box-val { font-size: 16px; font-weight: 900; }
-
-        .table-wrap { flex: 1; overflow-y: auto; background: #1e293b; border: 1.5px solid #334155; border-radius: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; padding: 20px; }
+        .header { background: var(--card); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); margin-bottom:20px; border-radius:12px; }
+        .btn-dash { background: var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; }
+        .layout { display: grid; grid-template-columns: 1fr 380px; flex: 1; gap: 20px; }
+        .table-area { background: var(--card); border: 1px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
+        .filter-bar { padding: 14px; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+        .date-input { background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 8px; outline: none; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
-        th { background: #334155; color: #f8fafc; padding: 14px; font-size: 13.5px; font-weight: 800; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #475569; }
-        td { padding: 12px 14px; border-bottom: 1px solid #334155; font-size: 13.5px; font-weight: 600; color: #cbd5e1; }
-        tbody tr { cursor: pointer; transition: background 0.15s; }
-        tbody tr:nth-child(even) { background: #162032; }
-        tbody tr:hover { background: #1e293b !important; }
-        tbody tr.selected-row { background: #1e293b !important; outline: 2px solid #f59e0b; }
-
-        .input-sidebar { background: #1e293b; border-left: 2px solid #334155; padding: 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; box-shadow: -4px 0 15px rgba(0,0,0,0.2); }
-        .field-group { display: flex; flex-direction: column; gap: 5px; text-align: right; }
-        .field-group label { font-size: 13px; font-weight: 800; color: #cbd5e1; }
-        .c-input { width: 100%; padding: 11px 14px; background: #0f172a; border: 1.5px solid #475569; border-radius: 10px; font-size: 14px; font-weight: 700; color: #fff; outline: none; }
-        .c-input:focus { border-color: #10b981; }
-        .c-amount { font-size: 18px; font-weight: 900; color: #10b981; background: #0f172a; text-align: center; }
-
-        .btn-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
-        .action-btn { border: none; padding: 12px; border-radius: 10px; font-size: 13.5px; font-weight: 800; cursor: pointer; text-align: center; }
-        .btn-save { background: #10b981; color: #ffffff; }
-        .btn-update { background: #f59e0b; color: #0f172a; }
-        .btn-delete { background: #ef4444; color: #ffffff; }
-        .btn-clear { background: #64748b; color: #ffffff; }
-
-        @media (max-width: 1000px) {
-            .masrwf-layout { grid-template-columns: 1fr; }
-            .input-sidebar { border-left: none; border-top: 2px solid #334155; }
-        }
+        th { background: rgba(0,0,0,0.2); padding: 12px; color: var(--primary); font-size: 13px; font-weight: bold; border-bottom: 1px solid var(--border); }
+        td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+        tr.selected { background: rgba(0,0,0,0.3); outline: 1px solid var(--primary); }
+        .form-area { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+        .form-area label { font-size: 12px; font-weight: bold; color: #94A3B8; }
+        .c-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; outline: none; margin-top: 4px; }
+        .c-input:focus { border-color: var(--primary); }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: #fff; }
+        .btn-save { background: var(--accent); color: #000; }
+        .btn-edit { background: var(--primary); color: #000; }
+        .btn-del { background: var(--danger); }
+        .btn-clr { background: var(--border); }
+        @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
-    <header class="header-panel">
-        <div class="header-title">🧾 بەڕێوەبردنی مەسرووفات و خەرجییەکان</div>
-        <a href="/admin" class="btn-dash">⬅️ داشبۆرد</a>
+    <header class="header">
+        <h2 style="color:var(--danger); font-size:18px;" data-tr="expenses">🧾 مەسرووفات</h2>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅️ داشبۆرد</a>
     </header>
-
-    <div class="masrwf-layout">
-        <main class="grid-area">
+    <div class="layout">
+        <div class="table-area">
             <div class="filter-bar">
-                <form method="GET" action="/admin/masrwf" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                    <div class="filter-item">
-                        <label>📅 لە بەرواری:</label>
-                        <div class="date-input-wrap">
-                            <input type="date" name="from_date" value="{{ from_date }}">
-                        </div>
-                    </div>
-                    <div class="filter-item">
-                        <label>📅 تا بەرواری:</label>
-                        <div class="date-input-wrap">
-                            <input type="date" name="to_date" value="{{ to_date }}">
-                        </div>
-                    </div>
-                    <button type="submit" class="btn-icon-only" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;" title="گەڕان و فلتەرکردن">🔍</button>
-                    <a href="/admin/masrwf" class="btn-icon-only" style="background: #334155; color: #f8fafc;" title="گەڕانەوە بۆ سەرەتا">🔄</a>
+                <form method="GET" style="display:flex; gap:10px;">
+                    <input type="date" name="from_date" value="{{ from_date }}" class="date-input">
+                    <input type="date" name="to_date" value="{{ to_date }}" class="date-input">
+                    <button type="submit" style="padding:8px 16px; background:var(--accent); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">گەڕان</button>
                 </form>
-
-                <div class="summary-badges">
-                    <div class="summary-box" style="border-color: #10b981;">
-                        <div class="summary-box-title" style="color: #a7f3d0;">کۆی مەسرووف</div>
-                        <div class="summary-box-val" id="lblTotalExp" style="color: #10b981;">{{ "{:,.0f}".format(total_m) }} د.ع</div>
-                    </div>
-                    <div class="summary-box" style="border-color: #ef4444;">
-                        <div class="summary-box-title" style="color: #fca5a5;">کۆی قەرز</div>
-                        <div class="summary-box-val" id="lblTotalDebt" style="color: #ef4444;">{{ "{:,.0f}".format(total_qarz) }} د.ع</div>
-                    </div>
-                </div>
             </div>
-
-            <div class="table-wrap">
+            <div style="overflow-y:auto; flex:1;">
                 <table id="tblMasrwf">
-                    <thead>
-                        <tr>
-                            <th style="width: 60px;">#</th>
-                            <th>بەروار</th>
-                            <th>جۆری مەسرووف</th>
-                            <th>کۆمپانیا / خەرجکەر</th>
-                            <th>بڕی پارە</th>
-                            <th>شێواز</th>
-                            <th>تێبینی</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>#</th><th>بەروار</th><th>جۆر</th><th>خەرجکەر</th><th>بڕی پارە</th><th>شێواز</th></tr></thead>
                     <tbody>
                         {% for r in rows %}
-                        <tr onclick="selectMasrwfRow(this, {{ r.id }}, '{{ r.m_date_raw }}', '{{ r.masrwf_type }}', '{{ r.spent_by }}', {{ r.amount }}, '{{ r.payment_type }}', '{{ r.notes }}')">
-                            <td>{{ loop.index }}</td>
-                            <td style="color: #38bdf8;">{{ r.m_date }}</td>
-                            <td style="font-weight:700; color:#f59e0b;">{{ r.masrwf_type }}</td>
-                            <td style="color:#10b981; font-weight:700;">{{ r.spent_by }}</td>
-                            <td style="color:#ef4444; font-weight:900; font-size:14.5px;">{{ "{:,.0f}".format(r.amount) }} د.ع</td>
-                            <td>
-                                <span style="background: {{ '#166534' if r.payment_type == 'نەغد' else '#991b1b' }}; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold;">{{ r.payment_type }}</span>
-                            </td>
-                            <td style="color:#94a3b8; text-align:right;">{{ r.notes }}</td>
+                        <tr onclick="selectRow(this, {{ r.id }}, '{{ r.m_date_raw }}', '{{ r.masrwf_type }}', '{{ r.spent_by }}', {{ r.amount }}, '{{ r.payment_type }}', '{{ r.notes }}')">
+                            <td>{{ loop.index }}</td><td>{{ r.m_date }}</td><td style="color:var(--primary);">{{ r.masrwf_type }}</td>
+                            <td>{{ r.spent_by }}</td><td style="color:var(--danger); font-weight:bold;">{{ "{:,.0f}".format(r.amount) }}</td>
+                            <td>{{ r.payment_type }}</td>
                         </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="padding:50px; color:#94a3b8; font-size:15px;">هیچ مەسرووفێک لەم ماوەیەدا نەدۆزرایەوە</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-        </main>
-
-        <aside class="input-sidebar">
-            <form id="masrwfForm" method="POST" action="/admin/save_masrwf">
+        </div>
+        <div class="form-area">
+            <form id="mForm" method="POST" action="/admin/save_masrwf">
                 <input type="hidden" id="selected_id" name="id" value="0">
-
-                <div class="field-group">
-                    <label>📅 بەرواری خەرجی:</label>
-                    <div class="date-input-wrap">
-                        <input type="date" id="txt_date" name="masrwf_date" class="c-input" value="{{ today_date }}" required style="width:100%;">
-                    </div>
+                <div><label>بەروار:</label><input type="date" id="txt_date" name="masrwf_date" class="c-input" value="{{ today_date }}" required></div>
+                <div><label>جۆری مەسرووف:</label><input list="typeOpt" id="txt_type" name="masrwf_type" class="c-input" required><datalist id="typeOpt">{% for t in existing_types %}<option value="{{ t }}">{% endfor %}</datalist></div>
+                <div><label>خەرجکەر:</label><input list="spOpt" id="txt_spent_by" name="spent_by" class="c-input"><datalist id="spOpt">{% for s in existing_spenders %}<option value="{{ s }}">{% endfor %}</datalist></div>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:2;"><label>بڕی پارە:</label><input type="number" id="txt_amount" name="amount" class="c-input" required></div>
+                    <div style="flex:1;"><label>شێواز:</label><select id="txt_payment_type" name="payment_type" class="c-input"><option value="نەغد">نەغد</option><option value="قەرز">قەرز</option></select></div>
                 </div>
-
-                <div class="field-group">
-                    <label>🏷️ جۆری مەسرووف:</label>
-                    <input list="typeOptions" id="txt_type" name="masrwf_type" class="c-input" required autocomplete="off">
-                    <datalist id="typeOptions">
-                        {% for t in existing_types %}<option value="{{ t }}">{% endfor %}
-                    </datalist>
-                </div>
-
-                <div class="field-group">
-                    <label>🏢 کۆمپانیا / شوێنی مەسروف کردن:</label>
-                    <input list="spentOptions" id="txt_spent_by" name="spent_by" class="c-input" autocomplete="off" oninput="filterTableBySpender()">
-                    <datalist id="spentOptions">
-                        {% for s in existing_spenders %}<option value="{{ s }}">{% endfor %}
-                    </datalist>
-                </div>
-
-                <div class="field-group">
-                    <label style="color:#f59e0b;">💵 بڕی پارە (دینار) و شێواز:</label>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="txt_amount" name="amount_display" class="c-input c-amount" required oninput="formatCurrency(this)" style="flex: 2;">
-                        <input type="hidden" id="real_amount" name="amount" value="0">
-                        <select id="txt_payment_type" name="payment_type" class="c-input" style="flex: 1; padding: 0; text-align: center;">
-                            <option value="نەغد">نەغد</option>
-                            <option value="قەرز">قەرز</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="field-group">
-                    <label>📄 تێبینی و وردەکاری:</label>
-                    <textarea id="txt_notes" name="notes" class="c-input" style="height: 65px; resize:none;"></textarea>
-                </div>
-
-                <div class="btn-grid-actions">
-                    <button type="button" class="action-btn btn-save" onclick="submitForm('/admin/save_masrwf')">💾 تۆمارکردن</button>
-                    <button type="button" class="action-btn btn-update" onclick="submitForm('/admin/update_masrwf')">✏️ گۆڕانکاری</button>
-                    <button type="button" class="action-btn btn-delete" onclick="deleteRecord()">🗑️ سڕینەوە</button>
-                    <button type="button" class="action-btn btn-clear" onclick="clearInputs()">🧹 پاککردنەوە</button>
+                <div><label>تێبینی:</label><input type="text" id="txt_notes" name="notes" class="c-input"></div>
+                <div class="btn-grid">
+                    <button type="button" class="btn btn-save" onclick="sub('/admin/save_masrwf')">تۆمارکردن</button>
+                    <button type="button" class="btn btn-edit" onclick="sub('/admin/update_masrwf')">گۆڕین</button>
+                    <button type="button" class="btn btn-del" onclick="del()">سڕینەوە</button>
+                    <button type="button" class="btn btn-clr" onclick="clr()">پاککردنەوە</button>
                 </div>
             </form>
-        </aside>
+        </div>
     </div>
-
     <script>
-        let currentSelectedId = 0;
-
-        function formatCurrency(input) {
-            let val = input.value.replace(/,/g, '').trim();
-            if (!isNaN(val) && val.length > 0) {
-                let num = parseFloat(val);
-                input.value = num.toLocaleString('en-US');
-                document.getElementById('real_amount').value = num;
-            } else {
-                input.value = '';
-                document.getElementById('real_amount').value = '0';
-            }
+        let sId = 0;
+        function selectRow(r, id, dt, ty, sp, am, pt, no) {
+            document.querySelectorAll('tr').forEach(tr=>tr.classList.remove('selected')); r.classList.add('selected');
+            sId = id; document.getElementById('selected_id').value = id;
+            document.getElementById('txt_date').value = dt; document.getElementById('txt_type').value = ty;
+            document.getElementById('txt_spent_by').value = sp; document.getElementById('txt_amount').value = am;
+            document.getElementById('txt_payment_type').value = pt; document.getElementById('txt_notes').value = no;
         }
-
-        function selectMasrwfRow(row, id, date, type, spentBy, amount, paymentType, notes) {
-            document.querySelectorAll('#tblMasrwf tbody tr').forEach(r => r.classList.remove('selected-row'));
-            row.classList.add('selected-row');
-
-            currentSelectedId = id;
-            document.getElementById('selected_id').value = id;
-            document.getElementById('txt_date').value = date;
-            document.getElementById('txt_type').value = (type === 'None' || !type) ? '' : type;
-            document.getElementById('txt_spent_by').value = (spentBy === 'None' || !spentBy) ? '' : spentBy;
-            
-            document.getElementById('real_amount').value = amount;
-            document.getElementById('txt_amount').value = Number(amount).toLocaleString('en-US');
-            document.getElementById('txt_payment_type').value = paymentType || 'نەغد';
-            
-            document.getElementById('txt_notes').value = (notes === 'None' || !notes) ? '' : notes;
+        function clr() {
+            sId = 0; document.getElementById('mForm').reset();
+            document.querySelectorAll('tr').forEach(tr=>tr.classList.remove('selected'));
+            document.getElementById('selected_id').value = 0;
         }
-
-        function clearInputs() {
-            currentSelectedId = 0;
-            document.getElementById('selected_id').value = '0';
-            document.getElementById('txt_type').value = '';
-            document.getElementById('txt_spent_by').value = '';
-            document.getElementById('txt_amount').value = '';
-            document.getElementById('real_amount').value = '0';
-            document.getElementById('txt_payment_type').value = 'نەغد';
-            document.getElementById('txt_notes').value = '';
-            document.getElementById('txt_date').value = '{{ today_date }}';
-            document.querySelectorAll('#tblMasrwf tbody tr').forEach(r => r.classList.remove('selected-row'));
+        function sub(url) {
+            if(url.includes('update') && sId === 0) return alert('سەرەتا دێڕێک هەڵبژێرە!');
+            let f = document.getElementById('mForm'); f.action = url; f.submit();
         }
-
-        // فلتەرکردنی خشتەکە و گۆڕینی کۆی مەسروف و قەرز بە شێوەی ڕاستەوخۆ
-        function filterTableBySpender() {
-            let filterValue = document.getElementById('txt_spent_by').value.trim().toLowerCase();
-            let rows = document.querySelectorAll('#tblMasrwf tbody tr');
-            let totalExp = 0;
-            let totalDebt = 0;
-            
-            if (rows.length === 1 && rows[0].cells.length === 1) return;
-
-            rows.forEach(row => {
-                let cell = row.cells[3]; // کۆمپانیا/خەرجکەر
-                if (cell) {
-                    let text = cell.textContent || cell.innerText;
-                    if (text.toLowerCase().indexOf(filterValue) > -1) {
-                        row.style.display = "";
-                        
-                        let amountText = row.cells[4].textContent.replace(/,/g, '').replace('د.ع', '').trim();
-                        let amt = parseFloat(amountText) || 0;
-                        totalExp += amt; // هەژمارکردنی هەموو مەسرووفات
-                        
-                        let typeText = row.cells[5].textContent.trim();
-                        if (typeText === 'قەرز') {
-                            totalDebt += amt; // هەژمارکردنی تەنها قەرزەکان
-                        }
-                    } else {
-                        row.style.display = "none";
-                    }
-                }
-            });
-            document.getElementById('lblTotalExp').innerText = totalExp.toLocaleString('en-US') + ' د.ع';
-            document.getElementById('lblTotalDebt').innerText = totalDebt.toLocaleString('en-US') + ' د.ع';
-        }
-
-        function submitForm(actionUrl) {
-            let form = document.getElementById('masrwfForm');
-            let amtVal = parseFloat(document.getElementById('real_amount').value) || 0;
-
-            if (actionUrl.includes('update_masrwf') && currentSelectedId <= 0) {
-                alert('تکایە سەرەتا دێڕێک لە خشتەکە دەستنیشان بکە بۆ گۆڕانکاری!');
-                return;
-            }
-
-            if (amtVal <= 0) {
-                alert('تکایە بڕی پارەکە بە دروستی بنووسە!');
-                return;
-            }
-
-            form.action = actionUrl;
-            form.submit();
-        }
-
-        function deleteRecord() {
-            if (currentSelectedId <= 0) {
-                alert('تکایە سەرەتا دێڕێک لە خشتەکە هەڵبژێرە بۆ سڕینەوە!');
-                return;
-            }
-
-            if (confirm('ئایا دڵنیایت لە سڕینەوەی ئەم تۆمارەی خەرجییە؟')) {
-                window.location.href = '/admin/delete_masrwf/' + currentSelectedId;
-            }
+        function del() {
+            if(sId === 0) return alert('دێڕێک هەڵبژێرە!');
+            if(confirm('دڵنیایت؟')) location.href = '/admin/delete_masrwf/' + sId;
         }
     </script>
 </body>
 </html>
 """
 
-# ==========================================
-# پەڕەی شاگردەکان (دیزاینی نوێ و شیکاری تەواو)
-# ==========================================
-WEB_WORKERS_TEMPLATE = """
+# ----------------- Workers -----------------
+WEB_WORKERS_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>حیساباتی شاگردەکان - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>شاگردەکان</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #0e1117; color: #fafafa; min-height: 100vh; padding: 24px; }
-        
-        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .main-title { font-size: 24px; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 10px; }
-        .btn-dash { background: #262730; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 14px; border: 1px solid #31333F; }
-        
-        .st-tabs { display: flex; gap: 30px; border-bottom: 1px solid #31333F; margin-bottom: 24px; }
-        .st-tab-btn { background: none; border: none; color: #94a3b8; font-size: 15px; font-weight: 700; padding: 12px 0; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
-        .st-tab-btn:hover { color: #ffffff; }
-        .st-tab-btn.active { color: #10b981; border-bottom: 2px solid #10b981; }
-        
-        .tab-content { display: none; animation: fadeIn 0.3s ease; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        .section-title { font-size: 18px; font-weight: 800; color: #f59e0b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
-        .st-form-row { display: flex; flex-direction: column; gap: 16px; background: #161b22; padding: 24px; border-radius: 12px; border: 1px solid #31333F; max-width: 600px; margin: 0 auto; }
-        
-        .st-input-group { display: flex; flex-direction: column; gap: 6px; }
-        .st-input-group label { font-size: 13px; font-weight: 700; color: #a7f3d0; }
-        .st-input { background: #ffffff; color: #0e1117; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: 700; outline: none; width: 100%; }
-        .st-input:focus { box-shadow: 0 0 0 2px #10b981; }
-        
-        .st-btn { background: #10b981; color: #0e1117; padding: 12px; border-radius: 8px; border: none; font-weight: 800; font-size: 14px; cursor: pointer; width: 100%; margin-top: 10px; transition: opacity 0.2s; }
-        .st-btn:hover { opacity: 0.9; }
-
-        .st-table-wrap { overflow-x: auto; background: #161b22; border-radius: 12px; border: 1px solid #31333F; margin-top: 20px; }
-        .st-table { width: 100%; border-collapse: collapse; text-align: center; }
-        .st-table th { background: #012e22; color: #10b981; padding: 14px; font-size: 13.5px; font-weight: 800; border-bottom: 2px solid #047857; }
-        .st-table td { padding: 14px; border-bottom: 1px solid #31333F; font-size: 13.5px; font-weight: 600; color: #f8fafc; }
-        .st-table tr:hover { background: #1e252e; }
-        
-        .btn-action-small { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-block; cursor: pointer; border: none; }
-        .btn-edit { background: #3b82f6; color: #fff; }
-        .btn-del { background: transparent; color: #ef4444; border: 1px solid #ef4444; }
-
-        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .modal-content { background: #161b22; border: 1px solid #31333F; border-radius: 14px; width: 100%; max-width: 420px; padding: 24px; }
-        
-        .filter-bar-stream { display: flex; gap: 16px; margin-bottom: 20px; }
-        .filter-bar-stream .st-input-group { flex: 1; }
-        .filter-bar-stream .st-btn { width: auto; padding: 12px 30px; margin-top: 24px; background: #3b82f6; color: #fff; }
-
-        /* دیزاینی نوێی ڕیزی شاگردەکان بۆ دەوام */
-        .worker-row { background: #161b22; border: 1px solid #31333F; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; transition: transform 0.15s; }
-        .worker-row:hover { border-color: #10b981; }
-        .worker-info { flex: 1; min-width: 150px; text-align: right; }
-        .worker-name { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 4px; }
-        .worker-salary { font-size: 12px; color: #10b981; font-weight: 700; }
-        .status-toggles { display: flex; gap: 16px; justify-content: center; flex: 1.5; min-width: 200px; }
-        .radio-label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 700; font-size: 14px; }
-        .bonus-box { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 6px; }
-        .bonus-box label { font-size: 11px; color: #f59e0b; font-weight: 700; }
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-dash { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .tab-btn { background: none; border: none; color: #94A3B8; font-weight: bold; font-size: 14px; cursor: pointer; padding: 10px; }
+        .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        .card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 14px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; margin-top: 15px; }
+        th { background: rgba(0,0,0,0.2); padding: 12px; color: var(--primary); font-size: 13px; font-weight: bold; border-bottom: 1px solid var(--border); }
+        td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 12px; color: #94A3B8; margin-bottom: 5px; }
+        .c-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; outline: none; }
+        .btn-action { background: var(--accent); color: #000; padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .worker-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 10px; }
+        .modal { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
+        .m-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; }
     </style>
 </head>
 <body>
-    <div class="header-container">
-        <div class="main-title">👷‍♂️ بەڕێوەبردن و حیسابکردنی مووچەی شاگردەکان</div>
-        <a href="/admin" class="btn-dash">⬅️ گەڕانەوە بۆ داشبۆرد</a>
+    <div class="header">
+        <h2 style="color:var(--primary); font-size:18px;" data-tr="workers">👥 حیساباتی شاگردەکان</h2>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅️ داشبۆرد</a>
+    </div>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('calc')">💰 مووچە</button>
+        <button class="tab-btn" onclick="showTab('att')">🗓️ دەوام و بەخشش</button>
+        <button class="tab-btn" onclick="showTab('add')">➕ زیادکردن</button>
     </div>
 
-    <!-- تابەکان -->
-    <div class="st-tabs">
-        <button class="st-tab-btn active" onclick="openTab(event, 'tab-calc')">💰 هەژمارکردنی مووچە و بەخشش</button>
-        <button class="st-tab-btn" onclick="openTab(event, 'tab-att')">🗓️ تۆمارکردنی دەوام (هاتن / نەهاتن)</button>
-        <button class="st-tab-btn" onclick="openTab(event, 'tab-add')">➕ زیادکردنی شاگرد</button>
-    </div>
-
-    <!-- تابی 1: هەژمارکردنی مووچە -->
-    <div id="tab-calc" class="tab-content active">
-        <div class="section-title">💰 هەژمارکردنی مووچەی کۆکراوە و بەخششی شاگردەکان بەپێی بەروار</div>
-        
-        <form method="GET" action="/admin/workers" class="filter-bar-stream">
-            <div class="st-input-group">
-                <label>لە بەرواری:</label>
-                <input type="date" name="start_date" class="st-input" value="{{ start_date }}" required>
-            </div>
-            <div class="st-input-group">
-                <label>بۆ بەرواری:</label>
-                <input type="date" name="end_date" class="st-input" value="{{ end_date }}" required>
-            </div>
-            <button type="submit" class="st-btn">🔍 فلتەرکردن</button>
+    <div id="calc" class="tab-content active card">
+        <form method="GET" style="display:flex; gap:10px; margin-bottom: 15px;">
+            <input type="date" name="start_date" value="{{ start_date }}" class="c-input" style="width: auto;">
+            <input type="date" name="end_date" value="{{ end_date }}" class="c-input" style="width: auto;">
+            <button type="submit" class="btn-action">فلتەر</button>
         </form>
-
-        <div class="st-table-wrap">
-            <table class="st-table">
-                <thead>
-                    <tr>
-                        <th>ناوی شاگرد</th>
-                        <th>مۆبایل</th>
-                        <th>ڕۆژانی دەوام</th>
-                        <th>مووچەی ڕۆژانە</th>
-                        <th>کۆی مووچە</th>
-                        <th>کۆی بەخشش</th>
-                        <th>کۆی گشتی شایستە</th>
-                        <th>کردارەکان</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for w in wage_rows %}
-                    <tr>
-                        <td style="font-weight:800; color:#10b981;">{{ w.name }}</td>
-                        <td style="color:#94a3b8;">{{ w.phone }}</td>
-                        <td style="color:#38bdf8;">{{ w.work_days }} ڕۆژ</td>
-                        <td>{{ "{:,.0f}".format(w.salary) }} د.ع</td>
-                        <td>{{ "{:,.0f}".format(w.total_salary) }} د.ع</td>
-                        <td style="color:#f59e0b;">{{ "{:,.0f}".format(w.total_bonus) }} د.ع</td>
-                        <td style="color:#10b981; font-weight:800; font-size:15px;">{{ "{:,.0f}".format(w.total_due) }} د.ع</td>
-                        <td>
-                            <button type="button" class="btn-action-small btn-edit" onclick="openWorkerModal({{ w.id }}, '{{ w.name }}', '{{ w.phone }}', {{ w.salary }})">دەستکاری</button>
-                            <a href="/admin/delete_worker/{{ w.id }}" class="btn-action-small btn-del" onclick="return confirm('ئایا دڵنیایت لە سڕینەوە؟')">سڕینەوە</a>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="8" style="padding:40px; color:#94a3b8;">هیچ داتایەک نەدۆزرایەوە</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- تابی 2: تۆمارکردنی دەوام (بە شێوەی لیست) -->
-    <div id="tab-att" class="tab-content">
-        <form method="POST" action="/admin/save_attendance">
-            <div class="section-title" style="justify-content:center; border-bottom: 2px solid #10b981; padding-bottom: 12px; margin-bottom: 24px;">
-                📅 دیاریکردنی دۆخی دەوامی ڕۆژانە و بەخشش
-            </div>
-            
-            <div class="st-input-group" style="margin-bottom: 24px; max-width: 350px; margin-left: 0; margin-right: auto;">
-                <label style="text-align: right; color:#f59e0b;">ڕۆژی دەوام:</label>
-                <input type="date" name="att_date" class="st-input" value="{{ today_date }}" required style="font-size: 16px; padding: 14px;">
-            </div>
-
-            <div style="display:flex; flex-direction:column;">
-                {% for aw in all_workers %}
-                <input type="hidden" name="worker_ids" value="{{ aw.id }}">
-                <div class="worker-row">
-                    <!-- ناوی شاگرد -->
-                    <div class="worker-info">
-                        <div class="worker-name">👷‍♂️ {{ aw.name }}</div>
-                        <div class="worker-salary">ڕۆژانە: {{ "{:,.0f}".format(aw.salary) }} د.ع</div>
-                    </div>
-
-                    <!-- دۆخی هاتن / نەهاتن -->
-                    <div class="status-toggles">
-                        <label class="radio-label" style="color: #10b981;">
-                            <input type="radio" name="status_{{ aw.id }}" value="هاتوو" {{ 'checked' if aw.last_status != 'نەهاتوو' else '' }} style="transform: scale(1.4);">
-                            هاتوو
-                        </label>
-                        <label class="radio-label" style="color: #fca5a5;">
-                            <input type="radio" name="status_{{ aw.id }}" value="نەهاتوو" {{ 'checked' if aw.last_status == 'نەهاتوو' else '' }} style="transform: scale(1.4);">
-                            نەهاتوو
-                        </label>
-                    </div>
-
-                    <!-- بەخشش -->
-                    <div class="bonus-box">
-                        <label>🎁 بەخشش / هەدیە (د.ع):</label>
-                        <input type="number" name="bonus_{{ aw.id }}" class="st-input" value="0" style="text-align: left; direction: ltr; padding: 10px;">
-                    </div>
-                </div>
-                {% else %}
-                <div style="text-align:center; color:#94a3b8; padding:30px;">هیچ شاگردێک لە سیستەمەکەدا نییە. تکایە سەرەتا شاگرد زیاد بکە.</div>
-                {% endfor %}
-            </div>
-            
-            <button type="submit" class="st-btn" style="margin-top: 30px; padding: 16px; font-size: 16px;">💾 پاشەکەوتکردنی دەوامی هەموو شاگردەکان</button>
-        </form>
-    </div>
-
-    <!-- تابی 3: زیادکردنی شاگرد -->
-    <div id="tab-add" class="tab-content">
-        <form method="POST" action="/admin/add_worker" class="st-form-row">
-            <div class="section-title">➕ تۆمارکردنی شاگردی نوێ لە سیستەم</div>
-            <div class="st-input-group">
-                <label>ناوی تەواوی شاگرد:</label>
-                <input type="text" name="name" class="st-input" required placeholder="بۆ نموونە: داستان">
-            </div>
-            <div class="st-input-group">
-                <label>ژمارەی مۆبایل:</label>
-                <input type="text" name="phone" class="st-input" placeholder="0750xxxxxxx">
-            </div>
-            <div class="st-input-group">
-                <label>مووچەی ڕۆژانە (دینار):</label>
-                <input type="number" name="salary" class="st-input" required placeholder="25000">
-            </div>
-            <button type="submit" class="st-btn">➕ پاشەکەوتکردنی شاگرد</button>
-        </form>
-    </div>
-
-    <!-- مۆدێڵی ئیدیتی شاگرد -->
-    <div class="modal" id="workerEditModal">
-        <div class="modal-content">
-            <h3 style="color:#10b981; margin-bottom:20px; text-align:center;">✏️ دەستکاریکردنی زانیاری شاگرد</h3>
-            <form id="editWorkerForm" method="POST" action="">
-                <div class="st-input-group" style="margin-bottom:12px;">
-                    <label>ناوی شاگرد:</label>
-                    <input type="text" id="m_worker_name" name="name" class="st-input" required>
-                </div>
-                <div class="st-input-group" style="margin-bottom:12px;">
-                    <label>تەلەفۆن:</label>
-                    <input type="text" id="m_worker_phone" name="phone" class="st-input">
-                </div>
-                <div class="st-input-group" style="margin-bottom:20px;">
-                    <label>مووچەی ڕۆژانە (دینار):</label>
-                    <input type="number" id="m_worker_salary" name="salary" class="st-input" required>
-                </div>
-                <button type="submit" class="st-btn">💾 پاشەکەوتکردن</button>
-                <button type="button" onclick="closeWorkerModal()" style="background:transparent; border:1px solid #31333F; color:#94a3b8; width:100%; padding:12px; border-radius:8px; margin-top:10px; cursor:pointer;">داخستن</button>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        function openTab(evt, tabName) {
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-                tabcontent[i].classList.remove("active");
-            }
-            tablinks = document.getElementsByClassName("st-tab-btn");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-            document.getElementById(tabName).style.display = "block";
-            document.getElementById(tabName).classList.add("active");
-            evt.currentTarget.className += " active";
-        }
-
-        function openWorkerModal(id, name, phone, salary) {
-            document.getElementById('editWorkerForm').action = '/admin/edit_worker/' + id;
-            document.getElementById('m_worker_name').value = name;
-            document.getElementById('m_worker_phone').value = phone;
-            document.getElementById('m_worker_salary').value = salary;
-            document.getElementById('workerEditModal').style.display = 'flex';
-        }
-        function closeWorkerModal() {
-            document.getElementById('workerEditModal').style.display = 'none';
-        }
-    </script>
-</body>
-</html>
-"""
-# ==========================================
-# پەڕەی بەڕێوەبردنی بەکارهێنەران
-# ==========================================
-WEB_USERS_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="ckb" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بەڕێوەبردنی بەکارهێنەران - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #03261d; color: #ffffff; min-height: 100vh; padding: 20px; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #064032; padding: 14px 20px; border-radius: 12px; border: 1px solid #0b5e4a; margin-bottom: 20px; }
-        .btn-dash { background: #334155; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 13px; }
-        
-        .user-form-card { background: #064032; border: 1.5px solid #0b5e4a; border-radius: 14px; padding: 20px; margin-bottom: 24px; }
-        .user-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: flex-end; }
-        .user-form-card label { display: block; font-size: 12px; font-weight: 700; color: #a7f3d0; margin-bottom: 5px; }
-        .user-form-card input, .user-form-card select { width: 100%; padding: 10px; background: #03261d; border: 1.5px solid #0b5e4a; border-radius: 8px; color: #fff; font-size: 13px; outline: none; }
-        .btn-save-u { background: #10b981; color: #03261d; border: none; padding: 11px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 14px; width: 100%; }
-
-        .table-responsive { overflow-x: auto; background: #064032; border: 1px solid #0b5e4a; border-radius: 12px; }
-        table { width: 100%; border-collapse: collapse; text-align: right; }
-        th { background: #085341; padding: 12px 14px; color: #a7f3d0; font-size: 13px; font-weight: 800; border-bottom: 1px solid #0b5e4a; }
-        td { padding: 12px 14px; border-bottom: 1px solid #0b5e4a; font-size: 13px; color: #f8fafc; }
-        tr:hover { background: #085341; }
-        .status-badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; }
-        .status-active { background: #dcfce7; color: #166534; }
-        .status-blocked { background: #fee2e2; color: #991b1b; }
-        .action-btn { padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-block; cursor: pointer; border: none; }
-        .btn-toggle { background: #f59e0b; color: #000; }
-        .btn-edit { background: #3b82f6; color: #fff; }
-        .btn-del { background: #ef4444; color: #fff; }
-
-        .modal-edit { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .modal-edit-box { background: #064032; border: 2px solid #0b5e4a; border-radius: 16px; width: 100%; max-width: 440px; padding: 22px; color: #fff; }
-    </style>
-</head>
-<body>
-    <div class="top-bar">
-        <h2 style="color:#10b981;">🔐 بەڕێوەبردنی بەکارهێنەران و دەسەڵاتەکان</h2>
-        <a href="/admin" class="btn-dash">⬅️ داشبۆرد</a>
-    </div>
-
-    <div class="user-form-card">
-        <h3 style="color:#a7f3d0; margin-bottom:14px; font-size:15px;">➕ زیادکردنی بەکارهێنەری نوێ</h3>
-        <form method="POST" action="/admin/add_user">
-            <div class="user-grid">
-                <div>
-                    <label>ناوی بەکارهێنەر (Username):</label>
-                    <input type="text" name="username" required placeholder="یوسەر">
-                </div>
-                <div>
-                    <label>وشەی نهێنی (Password):</label>
-                    <input type="text" name="password" required placeholder="پاسوۆرد">
-                </div>
-                <div>
-                    <label>ناوی تەواو (Full Name):</label>
-                    <input type="text" name="full_name" placeholder="ناوی کەسەکە">
-                </div>
-                <div>
-                    <label>ڕۆڵ لە سیستەم (Role):</label>
-                    <select name="role">
-                        <option value="Manager">👑 بەڕێوەبەر (Manager)</option>
-                        <option value="Waiter">🍽️ گارسۆنی ئایپاد (Waiter)</option>
-                        <option value="Mobile_Waiter">📱 گارسۆنی مۆبایل (Mobile Waiter)</option>
-                        <option value="Cashier">💵 کاشێر (Cashier)</option>
-                    </select>
-                </div>
-                <div>
-                    <button type="submit" class="btn-save-u">💾 دروستکردنی یوسەر</button>
-                </div>
-            </div>
-        </form>
-    </div>
-
-    <div class="table-responsive">
         <table>
-            <thead>
+            <thead><tr><th>ناو</th><th>ڕۆژانە</th><th>دەوام (ڕۆژ)</th><th>کۆی مووچە</th><th>بەخشش</th><th>کۆی گشتی</th><th>کردار</th></tr></thead>
+            <tbody>
+                {% for w in wage_rows %}
                 <tr>
-                    <th>#</th>
-                    <th>ناوی بەکارهێنەر</th>
-                    <th>وشەی نهێنی</th>
-                    <th>ناوی تەواو</th>
-                    <th>ڕۆڵ</th>
-                    <th>دۆخ</th>
-                    <th>کردارەکان</th>
+                    <td style="color:var(--accent); font-weight:bold;">{{ w.name }}</td><td>{{ "{:,.0f}".format(w.salary) }}</td>
+                    <td>{{ w.work_days }}</td><td>{{ "{:,.0f}".format(w.total_salary) }}</td>
+                    <td style="color:var(--primary);">{{ "{:,.0f}".format(w.total_bonus) }}</td>
+                    <td style="color:var(--accent); font-weight:bold;">{{ "{:,.0f}".format(w.total_due) }}</td>
+                    <td>
+                        <button style="background:#3b82f6; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="openEdit({{ w.id }}, '{{ w.name }}', {{ w.salary }})">دەستکاری</button>
+                        <a href="/admin/delete_worker/{{ w.id }}" style="color:var(--danger); text-decoration:none; margin-right:10px;" onclick="return confirm('سڕینەوە؟')">🗑️</a>
+                    </td>
                 </tr>
-            </thead>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div id="att" class="tab-content card">
+        <form method="POST" action="/admin/save_attendance">
+            <input type="date" name="att_date" value="{{ today_date }}" class="c-input" style="width:200px; margin-bottom:15px;">
+            {% for aw in all_workers %}
+            <div class="worker-row">
+                <input type="hidden" name="worker_ids" value="{{ aw.id }}">
+                <div style="font-weight:bold; width: 150px;">{{ aw.name }}</div>
+                <div><label><input type="radio" name="status_{{ aw.id }}" value="هاتوو" {{ 'checked' if aw.last_status != 'نەهاتوو' else '' }}> هاتوو</label></div>
+                <div><label><input type="radio" name="status_{{ aw.id }}" value="نەهاتوو" {{ 'checked' if aw.last_status == 'نەهاتوو' else '' }}> نەهاتوو</label></div>
+                <div><input type="number" name="bonus_{{ aw.id }}" class="c-input" value="0" placeholder="بەخشش" style="width:100px;"></div>
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn-action" style="width:100%; margin-top:10px;">پاشەکەوتکردنی دەوام</button>
+        </form>
+    </div>
+    
+    <div id="add" class="tab-content card">
+        <form method="POST" action="/admin/add_worker" style="max-width: 400px; margin: 0 auto;">
+            <div class="input-group"><label>ناو</label><input type="text" name="name" class="c-input" required></div>
+            <div class="input-group"><label>مۆبایل</label><input type="text" name="phone" class="c-input"></div>
+            <div class="input-group"><label>مووچەی ڕۆژانە</label><input type="number" name="salary" class="c-input" required></div>
+            <button type="submit" class="btn-action" style="width:100%;">تۆمارکردن</button>
+        </form>
+    </div>
+
+    <div class="modal" id="editModal">
+        <div class="m-box">
+            <h3 style="color:var(--primary); margin-bottom:15px; text-align:center;">دەستکاریکردنی شاگرد</h3>
+            <form id="editForm" method="POST">
+                <input type="text" id="e_name" name="name" class="c-input" placeholder="ناو" required style="margin-bottom:10px;">
+                <input type="number" id="e_salary" name="salary" class="c-input" placeholder="مووچە" required style="margin-bottom:10px;">
+                <button type="submit" style="background:var(--accent); color:#000; width:100%; padding:10px; border:none; border-radius:8px; font-weight:bold; margin-top:10px;">پاشەکەوتکردن</button>
+                <button type="button" style="background:transparent; border:1px solid var(--border); color:#fff; width:100%; padding:10px; border-radius:8px; font-weight:bold; margin-top:5px;" onclick="document.getElementById('editModal').style.display='none'">داخستن</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+        function openEdit(id, n, s) {
+            document.getElementById('editForm').action = '/admin/edit_worker/' + id;
+            document.getElementById('e_name').value = n;
+            document.getElementById('e_salary').value = s;
+            document.getElementById('editModal').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
+"""
+
+# ----------------- Users -----------------
+WEB_USERS_TEMPLATE = COMMON_HEAD + """
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>بەکارهێنەران</title>
+    <style>
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-dash { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; }
+        .card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 14px; margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: end; }
+        .c-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; outline: none; }
+        .btn-add { background: var(--accent); color: #000; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
+        table { width: 100%; border-collapse: collapse; text-align: center; }
+        th { background: rgba(0,0,0,0.2); padding: 12px; color: var(--primary); font-size: 13px; border-bottom: 1px solid var(--border); }
+        td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+        .modal { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
+        .m-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 style="color:var(--primary); font-size:18px;" data-tr="users">🔐 بەکارهێنەران</h2>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅️ داشبۆرد</a>
+    </div>
+    <div class="card">
+        <form method="POST" action="/admin/add_user" class="form-grid">
+            <div><label style="font-size:12px;color:#94A3B8;">یوسەر</label><input type="text" name="username" class="c-input" required></div>
+            <div><label style="font-size:12px;color:#94A3B8;">پاسوۆرد</label><input type="text" name="password" class="c-input" required></div>
+            <div><label style="font-size:12px;color:#94A3B8;">ناو</label><input type="text" name="full_name" class="c-input"></div>
+            <div>
+                <label style="font-size:12px;color:#94A3B8;">ڕۆڵ</label>
+                <select name="role" class="c-input">
+                    <option value="Manager">بەڕێوەبەر</option><option value="Waiter">گارسۆن ئایپاد</option>
+                    <option value="Mobile_Waiter">گارسۆن مۆبایل</option><option value="Cashier">کاشێر</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-add">زیادکردن</button>
+        </form>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+        <table>
+            <thead><tr><th>یوسەر</th><th>پاسوۆرد</th><th>ناو</th><th>ڕۆڵ</th><th>دۆخ</th><th>کردار</th></tr></thead>
             <tbody>
                 {% for u in users %}
                 <tr>
-                    <td>{{ loop.index }}</td>
-                    <td style="font-weight:700; color:#10b981;">{{ u.username }}</td>
-                    <td style="color:#cbd5e1; font-family:monospace; font-weight:bold;">{{ u.password }}</td>
-                    <td>{{ u.full_name }}</td>
+                    <td style="color:var(--accent); font-weight:bold;">{{ u.username }}</td><td>{{ u.password }}</td>
+                    <td>{{ u.full_name }}</td><td>{{ u.role }}</td>
+                    <td><a href="/admin/toggle_user/{{ u.id }}" style="color:{{ 'var(--accent)' if u.is_active else 'var(--danger)' }}; text-decoration:none;">{{ 'کارا' if u.is_active else 'بلۆک' }}</a></td>
                     <td>
-                        {% if u.role == 'Manager' %}👑 بەڕێوەبەر
-                        {% elif u.role == 'Waiter' %}🍽️ ئایپاد
-                        {% elif u.role == 'Mobile_Waiter' %}📱 مۆبایل
-                        {% elif u.role == 'Cashier' %}💵 کاشێر
-                        {% else %}{{ u.role }}{% endif %}
-                    </td>
-                    <td>
-                        <span class="status-badge {{ 'status-active' if u.is_active else 'status-blocked' }}">
-                            {{ 'چالاکە' if u.is_active else 'بلۆککراوە' }}
-                        </span>
-                    </td>
-                    <td>
-                        <a href="/admin/toggle_user/{{ u.id }}" class="action-btn btn-toggle">
-                            {{ '⛔ بلۆککردن' if u.is_active else '✅ کاراکردن' }}
-                        </a>
-                        <button type="button" class="action-btn btn-edit" onclick="openUserEdit({{ u.id }}, '{{ u.username }}', '{{ u.password }}', '{{ u.full_name }}', '{{ u.role }}')">✏️ دەستکاری</button>
-                        {% if u.username != 'admin' %}
-                        <a href="/admin/delete_user/{{ u.id }}" class="action-btn btn-del" onclick="return confirm('ئایا دڵنیایت لە سڕینەوەی ئەم بەکارهێنەرە؟')">🗑️ سڕینەوە</a>
-                        {% endif %}
+                        <button style="background:#3b82f6; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="openEdit({{ u.id }}, '{{ u.username }}', '{{ u.password }}', '{{ u.full_name }}', '{{ u.role }}')">دەستکاری</button>
+                        {% if u.username != 'admin' %}<a href="/admin/delete_user/{{ u.id }}" style="color:var(--danger); text-decoration:none; margin-right:5px;" onclick="return confirm('سڕینەوە؟')">🗑️</a>{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -1223,1635 +644,910 @@ WEB_USERS_TEMPLATE = """
         </table>
     </div>
 
-    <div class="modal-edit" id="userEditModal">
-        <div class="modal-edit-box">
-            <h3 style="color:#10b981; margin-bottom:14px; text-align:center;">✏️ دەستکاریکردنی بەکارهێنەر</h3>
-            <form id="userEditForm" method="POST" action="">
-                <label style="font-size:12px; color:#a7f3d0;">ناوی بەکارهێنەر (Username):</label>
-                <input type="text" id="edit_username" name="username" style="width:100%; padding:9px; margin-bottom:10px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;" required>
-                
-                <label style="font-size:12px; color:#a7f3d0;">وشەی نهێنی (Password):</label>
-                <input type="text" id="edit_password" name="password" style="width:100%; padding:9px; margin-bottom:10px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;" required>
-                
-                <label style="font-size:12px; color:#a7f3d0;">ناوی تەواو (Full Name):</label>
-                <input type="text" id="edit_fullname" name="full_name" style="width:100%; padding:9px; margin-bottom:10px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;">
-                
-                <label style="font-size:12px; color:#a7f3d0;">ڕۆڵ لە سیستەم:</label>
-                <select id="edit_role" name="role" style="width:100%; padding:9px; margin-bottom:14px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;">
-                    <option value="Manager">👑 بەڕێوەبەر (Manager)</option>
-                    <option value="Waiter">🍽️ گارسۆنی ئایپاد (Waiter)</option>
-                    <option value="Mobile_Waiter">📱 گارسۆنی مۆبایل (Mobile Waiter)</option>
-                    <option value="Cashier">💵 کاشێر (Cashier)</option>
+    <div class="modal" id="editModal">
+        <div class="m-box">
+            <h3 style="color:var(--primary); margin-bottom:15px; text-align:center;">دەستکاریکردنی بەکارهێنەر</h3>
+            <form id="editForm" method="POST">
+                <input type="text" id="e_user" name="username" class="c-input" placeholder="یوسەر" required style="margin-bottom:10px;">
+                <input type="text" id="e_pass" name="password" class="c-input" placeholder="پاسوۆرد" required style="margin-bottom:10px;">
+                <input type="text" id="e_name" name="full_name" class="c-input" placeholder="ناو" style="margin-bottom:10px;">
+                <select id="e_role" name="role" class="c-input" style="margin-bottom:10px;">
+                    <option value="Manager">بەڕێوەبەر</option><option value="Waiter">گارسۆن ئایپاد</option>
+                    <option value="Mobile_Waiter">گارسۆن مۆبایل</option><option value="Cashier">کاشێر</option>
                 </select>
-                
-                <button type="submit" class="btn-save-u">💾 پاشەکەوتکردنی گۆڕانکاری</button>
-                <button type="button" onclick="closeUserEdit()" style="background:none; border:none; color:#94a3b8; width:100%; margin-top:10px; cursor:pointer;">داخستن</button>
+                <button type="submit" style="background:var(--accent); color:#000; width:100%; padding:10px; border:none; border-radius:8px; font-weight:bold; margin-top:10px;">پاشەکەوتکردن</button>
+                <button type="button" style="background:transparent; border:1px solid var(--border); color:#fff; width:100%; padding:10px; border-radius:8px; font-weight:bold; margin-top:5px;" onclick="document.getElementById('editModal').style.display='none'">داخستن</button>
             </form>
         </div>
     </div>
 
     <script>
-        function openUserEdit(id, user, pass, full, role) {
-            document.getElementById('userEditForm').action = '/admin/edit_user/' + id;
-            document.getElementById('edit_username').value = user;
-            document.getElementById('edit_password').value = pass;
-            document.getElementById('edit_fullname').value = full;
-            document.getElementById('edit_role').value = role;
-            document.getElementById('userEditModal').style.display = 'flex';
-        }
-        function closeUserEdit() {
-            document.getElementById('userEditModal').style.display = 'none';
+        function openEdit(id, u, p, n, r) {
+            document.getElementById('editForm').action = '/admin/edit_user/' + id;
+            document.getElementById('e_user').value = u;
+            document.getElementById('e_pass').value = p;
+            document.getElementById('e_name').value = n;
+            document.getElementById('e_role').value = r;
+            document.getElementById('editModal').style.display = 'flex';
         }
     </script>
 </body>
 </html>
 """
 
-# ==========================================
-# پەڕەی کاشێر
-# ==========================================
-WEB_CASHIER_TEMPLATE = """
+# ----------------- Cashier & Qasa -----------------
+WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>کاشێر و واصڵکردن - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>کاشێر</title>
     <style>
-.takeaway-card { background-color: #0284c7 !important; border-color: #0369a1 !important; }
-.takeaway-card:hover { background-color: #0369a1 !important; transform: translateY(-3px); }
-.takeaway-card .card-badge { background: #0369a1 !important; color: #ffffff !important; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #fef3c7; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
-        
-        .cashier-nav { background: #064032; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0b5e4a; color: #fff; }
-        .cashier-brand { font-size: 20px; font-weight: 800; color: #10b981; }
-        .btn-dash-back { background: #10b981; color: #03261d; text-decoration: none; padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 13px; }
-
-        .cashier-container { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
-        
-        .header-status-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .active-count-badge { background: #047857; color: #fef08a; padding: 8px 18px; border-radius: 12px; font-size: 16px; font-weight: 800; }
-        .search-box { padding: 10px 16px; border-radius: 10px; border: 2px solid #cbd5e1; width: 260px; font-size: 14px; font-weight: 700; outline: none; }
-        .search-box:focus { border-color: #10b981; }
-
-        .tables-flow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
-        .table-card { background-color: #10b981; border: 2px solid #047857; border-radius: 14px; height: 160px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; text-align: center; color: #fff; transition: transform 0.15s, background-color 0.15s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); user-select: none; }
-        .table-card:hover { background-color: #059669; transform: translateY(-3px); }
-        .card-icon { font-size: 28px; margin-top: 10px; }
-        .card-title { font-size: 18px; font-weight: 800; }
-        .card-badge { background: #047857; color: #fef08a; padding: 8px; font-size: 12px; font-weight: 800; border-radius: 0 0 12px 12px; }
-
-        .empty-container { background: #fffbeb; border: 2px dashed #fde68a; border-radius: 16px; padding: 50px; text-align: center; color: #78350f; grid-column: 1 / -1; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-        .modal-content { background: #ffffff; border-radius: 16px; width: 100%; max-width: 650px; padding: 24px; color: #0f172a; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
-        .modal-title { font-size: 18px; font-weight: 800; color: #0f172a; }
-        .btn-close-modal { background: none; border: none; font-size: 22px; cursor: pointer; color: #ef4444; font-weight: bold; }
-
-        .items-table-wrap { max-height: 250px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 16px; }
-        .items-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
-        .items-table th { background: #1e293b; color: #fff; padding: 10px; font-weight: 800; position: sticky; top: 0; }
-        .items-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 700; }
-        
-        .checkout-calc-bar { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-        .calc-row { display: flex; justify-content: space-between; align-items: center; font-weight: 800; }
-        
-        .amount-input-group { display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .btn-quick-amt { border: none; color: #fff; padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer; }
-        .btn-p500 { background: #10b981; }
-        .btn-m500 { background: #e11d48; }
-        .txt-paid { width: 130px; padding: 8px; font-size: 16px; font-weight: 800; text-align: center; border: 2px solid #cbd5e1; border-radius: 8px; outline: none; }
-        .txt-paid:focus { border-color: #10b981; }
-
-        .btn-confirm-pay { width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 800; cursor: pointer; }
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--card); padding: 15px 20px; border-radius: 12px; border: 1px solid var(--border); }
+        .btn-dash { background: var(--accent); color: #000; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; }
+        .tables-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
+        .t-card { background: var(--card); border: 2px solid var(--border); border-radius: 14px; height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .t-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .t-card.safari { border-color: #3b82f6; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 15px; }
+        .m-box { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 500px; padding: 20px; }
+        .m-header { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; font-size: 18px; font-weight: bold; color: var(--primary); }
+        table { width: 100%; font-size: 13px; margin-bottom: 15px; text-align: center; }
+        th { color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+        td { padding: 5px 0; border-bottom: 1px dashed var(--border); }
+        .calc-box { background: var(--card); padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .calc-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; align-items: center; }
+        .c-input { background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 8px; width: 120px; text-align: center; outline: none; font-weight: bold; }
+        .btn-pay { background: var(--accent); color: #000; width: 100%; padding: 12px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <header class="cashier-nav">
-        <div class="cashier-brand">✨ دیوانی سوڵتان ڕێستۆرانت - کاشێر و واصڵکردن</div>
-        <div style="display:flex; align-items:center; gap:10px;">
-            <a href="/admin" class="btn-dash-back">⬅️ گەڕانەوە بۆ داشبۆرد</a>
-        </div>
-    </header>
-
-    <main class="cashier-container">
-        <div class="header-status-bar">
-            <div class="active-count-badge" id="lblActiveCount">مێزی داواکراو: {{ active_tables|length }}</div>
-            <input type="text" id="txtSearch" class="search-box" placeholder="🔍 گەڕان بەپێی ژمارەی مێز..." oninput="filterTables()">
-        </div>
-<div class="tables-flow-grid" id="tablesGrid">
-    {% for t in active_tables %}
-    <div class="table-card {% if 'سەفەری' in t.table_cabin %}takeaway-card{% endif %}" onclick="openCheckout(this.getAttribute('data-table'))" data-table="{{ t.table_cabin }}">
-        <div class="card-icon">
-            {% if 'سەفەری' in t.table_cabin %}🛵{% else %}🍽️{% endif %}
-        </div>
-        <div class="card-title">
-            {% if 'سەفەری' in t.table_cabin %}
-                {{ t.table_cabin | replace('سەفەری (', '') | replace(')', '') }}
-            {% else %}
-                مێزی {{ t.table_cabin }}
-            {% endif %}
-        </div>
-        <div class="card-badge">
-            {% if t.rounds > 1 %}
-                🔥 {{ t.rounds }} جار داواکراوە
-            {% else %}
-                ✓ ١ جار داواکراوە
-            {% endif %}
-        </div>
+    <div class="header">
+        <h2 style="color:var(--accent); font-size:18px;" data-tr="cashier">🛎️ کاشێر</h2>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">داشبۆرد</a>
     </div>
-    {% else %}
-    <div class="empty-container">
-        <div style="font-size: 45px; margin-bottom: 10px;">✨</div>
-        <div style="font-size: 18px; font-weight: 800;">لە ئێستادا سەرجەم مێزەکان بەتاڵن و هیچ داواکارییەکی کراوە نییە</div>
+    <div class="tables-grid" id="tablesGrid">
+        {% for t in active_tables %}
+        <div class="t-card {% if 'سەفەری' in t.table_cabin %}safari{% endif %}" onclick="openCh('{{ t.table_cabin }}')">
+            <div style="font-size:30px; margin-bottom:5px;">{{ '🛵' if 'سەفەری' in t.table_cabin else '🍽️' }}</div>
+            <div style="font-size:16px; font-weight:bold;">{{ t.table_cabin | replace('سەفەری (', '') | replace(')', '') }}</div>
+            <div style="font-size:11px; color:#94A3B8; margin-top:5px;">{{ t.rounds }} جار داواکراوە</div>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-</div>
-    </main>
 
-    <div class="modal-overlay" id="checkoutModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title" id="checkoutTitle">واصڵکردنی مێزی ژمارە: </div>
-                <button type="button" class="btn-close-modal" onclick="closeCheckout()">✕</button>
+    <div class="modal" id="chModal">
+        <div class="m-box">
+            <div class="m-header"><span id="chTitle">مێز</span><span style="color:var(--danger); cursor:pointer;" onclick="document.getElementById('chModal').style.display='none'">✕</span></div>
+            <div style="max-height:200px; overflow-y:auto;">
+                <table><thead><tr><th style="text-align:right;">خواردن</th><th>بڕ</th><th>نرخ</th><th>کۆ</th></tr></thead><tbody id="chList"></tbody></table>
             </div>
-
-            <div class="items-table-wrap">
-                <table class="items-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align:right;">ناوی خواردن</th>
-                            <th>ژمارە</th>
-                            <th>نرخی تاک</th>
-                            <th>کۆی گشتی</th>
-                        </tr>
-                    </thead>
-                    <tbody id="checkoutItemsList"></tbody>
-                </table>
-            </div>
-
-            <div class="checkout-calc-bar">
-                <div class="calc-row">
-                    <span>کۆی گشتی حساب:</span>
-                    <span id="lblTotalSum" style="font-size: 18px; color: #059669;">0 دینار</span>
-                </div>
-
-                <div class="calc-row">
-                    <span>پارەی وەرگیراو:</span>
-                    <div class="amount-input-group">
-                        <button type="button" class="btn-quick-amt btn-m500" onclick="adjustAmount(-500)">-٥٠٠</button>
-                        <button type="button" class="btn-quick-amt btn-p500" onclick="adjustAmount(500)">+٥٠٠</button>
-                        <input type="number" id="txtPaidAmount" class="txt-paid" oninput="calculateChange()">
+            <div class="calc-box">
+                <div class="calc-row"><span>کۆی حیساب:</span><span id="lblTot" style="color:var(--primary); font-size:18px;">0</span></div>
+                <div class="calc-row"><span>وەرگیراو:</span>
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="adj(-500)" style="background:var(--danger); color:#fff; border:none; border-radius:5px; padding:5px;">-٥٠٠</button>
+                        <input type="number" id="txtPaid" class="c-input" oninput="calcChange()">
+                        <button onclick="adj(500)" style="background:var(--accent); color:#000; border:none; border-radius:5px; padding:5px;">+٥٠٠</button>
                     </div>
                 </div>
-
-                <div class="calc-row">
-                    <span>گێڕاوە (باقی):</span>
-                    <span id="lblChange" style="font-size: 16px; color: #10b981;">0 دینار</span>
-                </div>
+                <div class="calc-row"><span>باقی:</span><span id="lblChange" style="color:var(--accent);">0</span></div>
             </div>
-
-            <button type="button" class="btn-confirm-pay" onclick="submitPayment()">✅ واصڵکردن و چاپکردن</button>
+            <button class="btn-pay" onclick="pay()">واصڵکردن و چاپ</button>
         </div>
     </div>
-
     <script>
-        let currentTable = '';
-        let totalSum = 0;
-        let currentItems = [];
-
-        function filterTables() {
-            let val = document.getElementById('txtSearch').value.trim().toLowerCase();
-            document.querySelectorAll('.table-card').forEach(card => {
-                let tbl = card.getAttribute('data-table').toLowerCase();
-                card.style.display = tbl.includes(val) ? 'flex' : 'none';
-            });
-        }
-
-        function openCheckout(tableNum) {
-            currentTable = tableNum;
-            document.getElementById('checkoutTitle').innerText = 'واصڵکردنی: ' + tableNum;
-            fetch('/get_table_orders/' + encodeURIComponent(tableNum))
-                .then(r => r.json())
-                .then(items => {
-                    currentItems = items;
-                    let tbody = document.getElementById('checkoutItemsList');
-                    tbody.innerHTML = '';
-                    totalSum = 0;
-
-                    items.forEach(it => {
-                        let lineTotal = it.price * it.quantity;
-                        totalSum += lineTotal;
-                        tbody.innerHTML += `
-                            <tr>
-                                <td style="text-align:right;">${it.food_name}</td>
-                                <td>${it.quantity}</td>
-                                <td>${Number(it.price).toLocaleString()}</td>
-                                <td>${lineTotal.toLocaleString()}</td>
-                            </tr>
-                        `;
-                    });
-
-                    document.getElementById('lblTotalSum').innerText = totalSum.toLocaleString() + ' دینار';
-                    document.getElementById('txtPaidAmount').value = totalSum;
-                    calculateChange();
-                    document.getElementById('checkoutModal').style.display = 'flex';
+        let curTable = '', tot = 0;
+        function openCh(tbl) {
+            curTable = tbl; document.getElementById('chTitle').innerText = tbl;
+            fetch('/get_table_orders/' + encodeURIComponent(tbl)).then(r=>r.json()).then(items => {
+                let tbody = document.getElementById('chList'); tbody.innerHTML = ''; tot = 0;
+                items.forEach(it => {
+                    let line = it.price * parseFloat(it.quantity); tot += line;
+                    tbody.innerHTML += `<tr><td style="text-align:right;">${it.food_name}</td><td>${parseFloat(it.quantity)}</td><td>${it.price}</td><td>${line}</td></tr>`;
                 });
-        }
-
-        function closeCheckout() {
-            document.getElementById('checkoutModal').style.display = 'none';
-        }
-
-        function adjustAmount(delta) {
-            let cur = parseInt(document.getElementById('txtPaidAmount').value) || 0;
-            let n = cur + delta;
-            if (n < 0) n = 0;
-            document.getElementById('txtPaidAmount').value = n;
-            calculateChange();
-        }
-
-        function calculateChange() {
-            let paid = parseInt(document.getElementById('txtPaidAmount').value) || 0;
-            let diff = paid - totalSum;
-            let changeEl = document.getElementById('lblChange');
-            if (diff >= 0) {
-                changeEl.innerText = diff.toLocaleString() + ' دینار';
-                changeEl.style.color = '#10b981';
-            } else {
-                changeEl.innerText = 'کەمترە بەبڕی: ' + Math.abs(diff).toLocaleString() + ' دینار';
-                changeEl.style.color = '#e11d48';
-            }
-        }
-
-        function submitPayment() {
-            let paid = parseFloat(document.getElementById('txtPaidAmount').value) || 0;
-            if (paid <= 0) {
-                alert('تکایە بڕی پارەی دروست بنووسە!');
-                return;
-            }
-
-            let btn = document.querySelector('.btn-confirm-pay');
-            btn.disabled = true;
-            btn.innerText = '⏳ چاوەڕێبە...';
-
-            fetch('/admin/complete_payment', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ table_number: currentTable, amount_paid: paid, total_amount: totalSum })
-            }).then(r => r.json()).then(res => {
-                if (res.status === 'success') {
-                    printWebReceipt(res.receipt);
-                } else {
-                    alert('هەڵە لە واصڵکردن: ' + res.message);
-                    btn.disabled = false;
-                    btn.innerText = '✅ واصڵکردن';
-                }
-            }).catch(err => {
-                alert('هەڵەیەک ڕوویدا لە کاتی ناردن.');
-                btn.disabled = false;
-                btn.innerText = '✅ واصڵکردن';
+                document.getElementById('lblTot').innerText = tot; document.getElementById('txtPaid').value = tot;
+                calcChange(); document.getElementById('chModal').style.display = 'flex';
             });
         }
-function printWebReceipt(data) {
-            let printWin = window.open('', '_blank', 'width=400,height=600');
-            let itemsHtml = '';
-            data.items.forEach(it => {
-                let p = it.price ? it.price : 0;
-                let q = it.quantity ? it.quantity : 0;
-                itemsHtml += `
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px; word-break:break-word;">
-                        <span style="flex:2; text-align:right; padding-left:2px;">${it.food_name || it[0]}</span>
-                        <span style="flex:0.8; text-align:center;">${q || it[1]}</span>
-                        <span style="flex:1.2; text-align:left;">${((p || it[2]) * (q || it[1])).toLocaleString()}</span>
-                    </div>`;
-            });
-
-            let html = `
-            <!DOCTYPE html>
-            <html lang="ckb" dir="rtl">
-            <head>
-                <meta charset="UTF-8">
-                <title>Receipt</title>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700;800&display=swap');
-                    @page { margin: 0; } /* ئەمە ڕێگری دەکات لە زیادکردنی پەراوێز لەلایەن وێبگەڕەوە */
-                    * { box-sizing: border-box; }
-                    body { 
-                        font-family: 'Noto Kufi Arabic', sans-serif; 
-                        width: 72mm; /* گونجاندن لەگەڵ کاغەزی 80 ملم */
-                        max-width: 100%;
-                        margin: 0 auto; 
-                        padding: 4mm; 
-                        color: #000; 
-                    }
-                    .center { text-align: center; }
-                    .bold { font-weight: 800; }
-                    .line { border-top: 1px dashed #000; margin: 6px 0; width: 100%; }
-                </style>
-            </head>
-            <body>
-                <div class="center bold" style="font-size:14px; margin-bottom:2px;">دیوانی سوڵتان ڕێستۆرانت</div>
-                <div class="center" style="font-size:10px; margin-bottom:4px;">وەسڵی فرۆشتن و قاسە</div>
-                <div class="center bold" style="font-size:12px; margin-bottom:6px;">مێزی: ${data.table}</div>
-                <div class="center" style="font-size:10px; margin-bottom:8px;">${data.time}</div>
-                
-                <div class="line"></div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold; margin-bottom:4px;">
-                    <span style="flex:2; text-align:right;">خواردن</span>
-                    <span style="flex:0.8; text-align:center;">بڕ</span>
-                    <span style="flex:1.2; text-align:left;">کۆی گشتی</span>
-                </div>
-                <div class="line"></div>
-                
-                ${itemsHtml}
-                
-                <div class="line"></div>
-                <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold;">
-                    <span>کۆی گشتی:</span>
-                    <span>${data.total.toLocaleString()} دینار</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px;">
-                    <span>پ. وەرگیراو:</span>
-                    <span>${data.paid.toLocaleString()} دینار</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px;">
-                    <span>گێڕاوە:</span>
-                    <span>${Math.max(0, data.paid - data.total).toLocaleString()} دینار</span>
-                </div>
-                <div class="line"></div>
-                <div class="center" style="font-size:10px; margin-top:8px;">بەخێر بێنەوە! سوپاس بۆ سەردانکردنتان</div>
-                
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        setTimeout(function() { window.close(); }, 500);
-                    }
-                </scr` + `ipt>
-            </body>
-            </html>`;
-            
-            printWin.document.write(html);
-            printWin.document.close();
-            
-            closeCheckout();
-            setTimeout(() => { location.reload(); }, 1000);
+        function adj(v) { let p = parseInt(document.getElementById('txtPaid').value)||0; document.getElementById('txtPaid').value = Math.max(0, p+v); calcChange(); }
+        function calcChange() { let d = (parseInt(document.getElementById('txtPaid').value)||0) - tot; document.getElementById('lblChange').innerText = d; document.getElementById('lblChange').style.color = d>=0?'var(--accent)':'var(--danger)'; }
+        function pay() {
+            let p = parseInt(document.getElementById('txtPaid').value)||0;
+            if(p<=0) return alert('بڕی پارە هەڵەیە');
+            fetch('/admin/complete_payment', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:curTable, amount_paid:p, total_amount:tot})})
+            .then(r=>r.json()).then(res=>{ if(res.status==='success'){ printR(res.receipt); } else alert(res.message); });
         }
-        setInterval(() => {
-            if (document.getElementById('checkoutModal').style.display !== 'flex' && document.getElementById('txtSearch').value.trim() === '') {
-                fetch(window.location.href)
-                    .then(r => r.text())
-                    .then(html => {
-                        let parser = new DOMParser();
-                        let doc = parser.parseFromString(html, 'text/html');
-                        let newGrid = doc.getElementById('tablesGrid');
-                        let newBadge = doc.getElementById('lblActiveCount');
-                        if (newGrid && newBadge) {
-                            document.getElementById('tablesGrid').innerHTML = newGrid.innerHTML;
-                            document.getElementById('lblActiveCount').innerText = newBadge.innerText;
-                        }
-                    });
-            }
-        }, 4000);
+        function printR(d) {
+            let win = window.open('','_blank','width=400,height=600');
+            let h = `<!DOCTYPE html><html dir="rtl"><head><style>body{font-family:sans-serif; width:72mm; margin:0 auto; padding:4mm; font-size:12px; text-align:center;} .line{border-top:1px dashed #000; margin:5px 0;} th,td{text-align:center; padding:2px;} .r{text-align:right;}</style></head><body>
+            <h3>چێشتماڵە</h3><div>مێزی: ${d.table}</div><div class="line"></div>
+            <table style="width:100%"><tr><th class="r">خواردن</th><th>بڕ</th><th>کۆ</th></tr>`;
+            d.items.forEach(it => { h += `<tr><td class="r">${it.food_name||it[0]}</td><td>${parseFloat(it.quantity||it[1])}</td><td>${(it.price||it[2])*parseFloat(it.quantity||it[1])}</td></tr>`; });
+            h += `</table><div class="line"></div><div style="text-align:right">کۆی گشتی: ${d.total}</div><div style="text-align:right">وەرگیراو: ${d.paid}</div>
+            <div class="line"></div><div>سوپاس!</div><script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}<\/script></body></html>`;
+            win.document.write(h); win.document.close();
+            document.getElementById('chModal').style.display='none'; setTimeout(()=>location.reload(), 1000);
+        }
     </script>
 </body>
 </html>
 """
-# ==========================================
-# پەڕەی قاسە
-# ==========================================
-WEB_QASA_TEMPLATE = """
+
+WEB_QASA_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>قاسە - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>قاسە</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #03261d; color: #ffffff; min-height: 100vh; padding: 20px; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #064032; padding: 14px 20px; border-radius: 12px; border: 1px solid #0b5e4a; margin-bottom: 20px; }
-        .btn-dash { background: #334155; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 13px; }
-        
-        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .s-card { background: #064032; border: 1.5px solid #0b5e4a; border-radius: 14px; padding: 20px; text-align: center; }
-        .s-title { font-size: 14px; font-weight: 700; color: #a7f3d0; margin-bottom: 8px; }
-        .s-val { font-size: 22px; font-weight: 800; color: #10b981; }
-        
-        .table-responsive { overflow-x: auto; background: #064032; border: 1px solid #0b5e4a; border-radius: 12px; }
-        table { width: 100%; border-collapse: collapse; text-align: center; }
-        th { background: #085341; padding: 14px; color: #10b981; font-size: 13.5px; font-weight: 800; border-bottom: 1px solid #0b5e4a; }
-        td { padding: 12px; border-bottom: 1px solid #0b5e4a; font-size: 13.5px; font-weight: 600; color: #f8fafc; }
-        tr:hover { background: #085341; }
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 14px 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .btn-dash { background: var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
+        .sum-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; text-align: center; }
+        .sum-val { font-size: 20px; font-weight: 900; margin-top:5px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; background: var(--card); border: 1px solid var(--border); }
+        th { background: rgba(0,0,0,0.2); padding: 14px; color: var(--primary); border-bottom: 1px solid var(--border); }
+        td { padding: 12px; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <h2 style="color:#10b981;">💵 قاسەی فرۆشتن (٢٤ کاتژمێری ڕابردوو)</h2>
-        <a href="/admin" class="btn-dash">⬅️ داشبۆرد</a>
+        <h2 style="color:var(--primary); font-size: 18px;">💵 قاسەی فرۆشتن (٢٤ کاتژمێری ڕابردوو)</h2>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅️ داشبۆرد</a>
     </div>
-
-    <div class="summary-cards">
-        <div class="s-card">
-            <div class="s-title">کۆی پارەی وەرگیراو لە قاسە</div>
-            <div class="s-val">{{ "{:,.0f}".format(total_received) }} د.ع</div>
-        </div>
-        <div class="s-card" style="border-color:#ef4444;">
-            <div class="s-title" style="color:#fca5a5;">کۆی داشکاندن (خەسارەت)</div>
-            <div class="s-val" style="color:#ef4444;">{{ "{:,.0f}".format(total_discount) }} د.ع</div>
-        </div>
+    <div class="summary-grid">
+        <div class="sum-card"><div>کۆی وەرگیراو لە قاسە</div><div class="sum-val" style="color: var(--accent);">{{ "{:,.0f}".format(total_received) }} د.ع</div></div>
+        <div class="sum-card" style="border-color:var(--danger);"><div>کۆی داشکاندن (خەسارەت)</div><div class="sum-val" style="color: var(--danger);">{{ "{:,.0f}".format(total_discount) }} د.ع</div></div>
     </div>
-
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th>ڕیزبەندی</th>
-                    <th>کات و بەروار</th>
-                    <th>شوێن / مێز</th>
-                    <th>پارەی وەرگیراو</th>
-                    <th>داشکاندن</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in qasa_rows %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td style="color:#38bdf8;">{{ r.transaction_time }}</td>
-                    <td style="font-weight:800;">{{ r.place_id }}</td>
-                    <td style="color:#10b981;">{{ "{:,.0f}".format(r.amount) }} د.ع</td>
-                    <td style="color:#ef4444;">{{ "{:,.0f}".format(r.discount) }} د.ع</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="5" style="padding:40px; color:#94a3b8;">هیچ فرۆشێک لە ٢٤ کاتژمێری ڕابردوودا نییە</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <table>
+        <thead><tr><th>کات</th><th>شوێن/مێز</th><th>وەرگیراو</th><th>داشکاندن</th></tr></thead>
+        <tbody>
+            {% for r in qasa_rows %}
+            <tr><td dir="ltr">{{ r.transaction_time }}</td><td style="font-weight:bold;">{{ r.place_id }}</td><td style="color:var(--accent);">{{ "{:,.0f}".format(r.amount) }}</td><td style="color:var(--danger);">{{ "{:,.0f}".format(r.discount) }}</td></tr>
+            {% else %}
+            <tr><td colspan="4" style="padding:20px;">هیچ داتایەک نییە لە ٢٤ کاتژمێری ڕابردوو</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>
 """
-# ==========================================
-# پەڕەی بەڕێوەبردنی خواردنەکان (Menu Manager)
-# ==========================================
-WEB_MENU_MANAGER_TEMPLATE = """
+
+# ----------------- Menu Manager -----------------
+WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بەڕێوەبردنی مێنۆ - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>مێنیو</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #03261d; color: #ffffff; min-height: 100vh; padding: 20px; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #064032; padding: 14px 20px; border-radius: 12px; border: 1px solid #0b5e4a; margin-bottom: 20px; }
-        .btn-dash { background: #334155; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 13px; }
-        
-        .form-card { background: #064032; border: 1.5px solid #0b5e4a; border-radius: 14px; padding: 18px; margin-bottom: 24px; }
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: flex-end; }
-        .form-card label { display: block; font-size: 12px; font-weight: 700; color: #a7f3d0; margin-bottom: 4px; }
-        .form-card input, .form-card select { width: 100%; padding: 10px; background: #03261d; border: 1.5px solid #0b5e4a; border-radius: 8px; color: #fff; font-size: 13px; outline: none; }
-        .btn-add { background: #10b981; color: #03261d; border: none; padding: 11px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 14px; }
-        
-        .food-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-        .food-item-box { background: #ffffff; color: #0f172a; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .food-item-img { width: 100%; height: 130px; object-fit: cover; border-radius: 10px; }
-        .food-item-title { font-size: 15px; font-weight: 800; }
-        .food-item-details { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #059669; }
-        .food-actions { display: flex; gap: 8px; margin-top: 6px; }
-        .btn-edit-food { flex: 1; background: #3b82f6; color: #fff; border: none; padding: 7px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; text-align: center; }
-        .btn-del-food { flex: 1; background: #ef4444; color: #fff; border: none; padding: 7px; border-radius: 6px; font-weight: 800; font-size: 12px; cursor: pointer; text-align: center; text-decoration: none; }
-
-        .modal-edit { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .modal-edit-box { background: #064032; border: 2px solid #0b5e4a; border-radius: 16px; width: 100%; max-width: 440px; padding: 22px; color: #fff; }
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-dash { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; }
+        .card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 14px; margin-bottom: 20px; }
+        .c-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; outline: none; margin-bottom: 10px; }
+        .f-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; }
+        .f-img { width: 100%; height: 130px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
+        .modal { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
+        .m-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; }
     </style>
 </head>
 <body>
-    <div class="top-bar">
-        <h2 style="color:#10b981;">📖 بەڕێوەبردنی خواردنەکان (ئیدیت و ئەپلۆدی وێنە)</h2>
-        <a href="/admin" class="btn-dash">⬅️ داشبۆرد</a>
+    <div class="header">
+        <h2 style="color:var(--primary); font-size:18px;" data-tr="menu">📖 بەڕێوەبردنی مێنیو</h2>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅️ داشبۆرد</a>
     </div>
-
-    <div class="form-card">
-        <h3 style="color:#a7f3d0; margin-bottom:12px; font-size:15px;">➕ زیادکردنی خواردنی نوێ</h3>
-        <form method="POST" action="/admin/add_food" enctype="multipart/form-data">
-            <div class="form-grid">
-                <div>
-                    <label>ناوی خواردن:</label>
-                    <input type="text" name="food_name" required placeholder="بۆ نموونە: کەبابی تایبەت">
-                </div>
-                <div>
-                    <label>نرخ (د.ع):</label>
-                    <input type="number" name="price" required placeholder="5000">
-                </div>
-                <div>
-                    <label>پۆلێن (کۆمبۆبۆکس):</label>
-                    <input list="categoryList" name="category" placeholder="پۆلێن هەڵبژێرە یان بنووسە..." required>
-                    <datalist id="categoryList">
-                        {% for c in existing_categories %}
-                            <option value="{{ c }}">
-                        {% endfor %}
-                    </datalist>
-                </div>
-                <div>
-                    <label>ئەپلۆدی وێنە (فایل):</label>
-                    <input type="file" name="food_image" accept="image/*">
-                </div>
-                <div>
-                    <label>یان لینکی وێنە:</label>
-                    <input type="text" name="image_path" placeholder="https://...">
-                </div>
-                <div>
-                    <button type="submit" class="btn-add">➕ زیادکردن</button>
-                </div>
+    <div class="card">
+        <form method="POST" action="/admin/add_food" enctype="multipart/form-data" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <input type="text" name="food_name" class="c-input" placeholder="ناو (کوردی)" required style="flex:1; margin:0;">
+            <input type="text" name="food_name_ar" class="c-input" placeholder="ناو (عەرەبی)" style="flex:1; margin:0;">
+            <input type="text" name="food_name_en" class="c-input" placeholder="ناو (ئینگلیزی)" style="flex:1; margin:0;">
+            <input type="number" name="price" class="c-input" placeholder="نرخ" required style="flex:1; margin:0;">
+            <input list="cats" name="category" class="c-input" placeholder="پۆلێن" required style="flex:1; margin:0;"><datalist id="cats">{% for c in existing_categories %}<option value="{{ c }}">{% endfor %}</datalist>
+            
+            <div style="flex:2; display:flex; gap:5px; margin:0;">
+                <input type="text" name="image_path_link" class="c-input" placeholder="لینکی وێنە (ئارەزوومەندانە)" style="margin:0;">
+                <input type="file" name="food_image" class="c-input" style="margin:0; padding:7px;">
             </div>
+            
+            <button type="submit" style="background:var(--accent); color:#000; padding:10px; border:none; border-radius:8px; font-weight:bold;">زیادکردن</button>
         </form>
     </div>
-
-    <div class="food-grid">
+    <div class="f-grid">
         {% for f in foods %}
-        <div class="food-item-box">
-            <img src="{{ f.image_path if f.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="food-item-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'">
-            <div class="food-item-title">{{ f.food_name }}</div>
-            <div class="food-item-details">
-                <span>{{ "{:,.0f}".format(f.price) }} د.ع</span>
-                <span style="color:#64748b;">{{ f.category }}</span>
-            </div>
-            <div class="food-actions">
-                <button type="button" class="btn-edit-food" onclick="openEditModal({{ f.id }}, '{{ f.food_name }}', {{ f.price }}, '{{ f.category }}', '{{ f.image_path }}')">✏️ دەستکاری</button>
-                <a href="/admin/delete_food/{{ f.id }}" class="btn-del-food" onclick="return confirm('ئایا دڵنیایت لە سڕینەوە؟')">🗑️ سڕینەوە</a>
+        <div class="f-card">
+            <img src="{{ f.image_path if f.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="f-img">
+            <div style="font-weight:bold; margin-bottom:5px;">{{ f.food_name }}</div>
+            <div style="color:var(--primary); margin-bottom:10px; font-weight:bold;">{{ "{:,.0f}".format(f.price) }} د.ع</div>
+            <div style="display:flex; gap:5px;">
+                <button style="flex:1; background:#3b82f6; color:#fff; border:none; padding:6px; border-radius:6px; cursor:pointer; font-weight:bold;" onclick="openEdit({{ f.id }}, '{{ f.food_name }}', '{{ f.food_name_ar }}', '{{ f.food_name_en }}', {{ f.price }}, '{{ f.category }}', '{{ f.image_path }}')">دەستکاری</button>
+                <a href="/admin/delete_food/{{ f.id }}" style="flex:1; background:var(--danger); color:#fff; padding:6px; border-radius:6px; text-decoration:none; font-weight:bold;" onclick="return confirm('سڕینەوە؟')">سڕینەوە</a>
             </div>
         </div>
         {% endfor %}
     </div>
 
-    <div class="modal-edit" id="editModal">
-        <div class="modal-edit-box">
-            <h3 style="color:#10b981; margin-bottom:14px; text-align:center;">✏️ دەستکاریکردنی خواردن</h3>
-            <form id="editForm" method="POST" action="" enctype="multipart/form-data">
-                <label style="font-size:12px; color:#a7f3d0;">ناوی خواردن:</label>
-                <input type="text" id="edit_food_name" name="food_name" style="width:100%; padding:9px; margin-bottom:10px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;" required>
+    <div class="modal" id="editModal">
+        <div class="m-box">
+            <h3 style="color:var(--primary); margin-bottom:15px; text-align:center;">دەستکاریکردنی خواردن</h3>
+            <form id="editForm" method="POST" enctype="multipart/form-data">
+                <input type="text" id="e_name" name="food_name" class="c-input" placeholder="ناو (کوردی)" required>
+                <input type="text" id="e_name_ar" name="food_name_ar" class="c-input" placeholder="ناو (عەرەبی)">
+                <input type="text" id="e_name_en" name="food_name_en" class="c-input" placeholder="ناو (ئینگلیزی)">
+                <input type="number" id="e_price" name="price" class="c-input" placeholder="نرخ" required>
                 
-                <label style="font-size:12px; color:#a7f3d0;">نرخ (دینار):</label>
-                <input type="number" id="edit_price" name="price" style="width:100%; padding:9px; margin-bottom:10px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;" required>
+                <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:5px;">پۆلێن</label>
+                <input list="edit_cats" id="e_cat" name="category" class="c-input" required>
+                <datalist id="edit_cats">{% for c in existing_categories %}<option value="{{ c }}">{% endfor %}</datalist>
                 
-                <label style="font-size:12px; color:#a7f3d0;">پۆلێن (کۆمبۆبۆکس):</label>
-                <input list="categoryList" id="edit_category" name="category" style="width:100%; padding:9px; margin-bottom:10px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;" required>
+                <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:5px;">وێنەی نوێ (لینک یان فایل)</label>
+                <input type="text" id="e_img_link" name="image_path_link" class="c-input" placeholder="لینکی وێنە (ئارەزوومەندانە)">
+                <input type="file" name="food_image" class="c-input" style="padding:7px;">
                 
-                <label style="font-size:12px; color:#a7f3d0;">ئەپلۆدی وێنەی نوێ:</label>
-                <input type="file" name="food_image" accept="image/*" style="width:100%; padding:7px; margin-bottom:10px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;">
-                
-                <label style="font-size:12px; color:#a7f3d0;">یان لینکی وێنە:</label>
-                <input type="text" id="edit_image_path" name="image_path" style="width:100%; padding:9px; margin-bottom:14px; border-radius:8px; border:1px solid #0b5e4a; background:#03261d; color:#fff;">
-                
-                <button type="submit" class="btn-add" style="width:100%;">💾 پاشەکەوتکردن</button>
-                <button type="button" onclick="closeEditModal()" style="background:none; border:none; color:#94a3b8; width:100%; margin-top:10px; cursor:pointer;">داخستن</button>
+                <button type="submit" style="background:var(--accent); color:#000; width:100%; padding:10px; border:none; border-radius:8px; font-weight:bold; margin-top:10px;">پاشەکەوتکردن</button>
+                <button type="button" style="background:transparent; border:1px solid var(--border); color:#fff; width:100%; padding:10px; border-radius:8px; font-weight:bold; margin-top:5px;" onclick="document.getElementById('editModal').style.display='none'">داخستن</button>
             </form>
         </div>
     </div>
-
     <script>
-        function openEditModal(id, name, price, category, imgPath) {
+        function openEdit(id, n, na, ne, p, c, imgUrl) {
             document.getElementById('editForm').action = '/admin/edit_food/' + id;
-            document.getElementById('edit_food_name').value = name;
-            document.getElementById('edit_price').value = price;
-            document.getElementById('edit_category').value = category;
-            document.getElementById('edit_image_path').value = imgPath;
+            document.getElementById('e_name').value = n;
+            document.getElementById('e_name_ar').value = na !== 'None' ? na : '';
+            document.getElementById('e_name_en').value = ne !== 'None' ? ne : '';
+            document.getElementById('e_price').value = p;
+            document.getElementById('e_cat').value = c;
+            document.getElementById('e_img_link').value = (imgUrl && imgUrl.startsWith('http')) ? imgUrl : '';
             document.getElementById('editModal').style.display = 'flex';
-        }
-        function closeEditModal() {
-            document.getElementById('editModal').style.display = 'none';
         }
     </script>
 </body>
 </html>
 """
 
-# ==========================================
-# پەڕەی بەڕێوەبردنی QR
-# ==========================================
-QR_MANAGER_TEMPLATE = """
+# ----------------- QR Manager -----------------
+QR_MANAGER_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بەڕێوەبردنی QR - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>QR مێزەکان</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #03261d; color: #ffffff; min-height: 100vh; padding: 20px; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #064032; padding: 14px 20px; border-radius: 12px; border: 1px solid #0b5e4a; margin-bottom: 20px; }
-        .btn-action { background: #10b981; color: #03261d; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; border: none; cursor: pointer; font-size: 13px; }
-        .controls-panel { background: #064032; padding: 14px 20px; border-radius: 12px; border: 1px solid #0b5e4a; margin-bottom: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
-        .qr-card { background: #ffffff; color: #0f172a; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #e2e8f0; }
-        .qr-card img { width: 140px; height: 140px; border-radius: 8px; margin: 10px 0; }
-        .qr-title { font-size: 18px; font-weight: 800; color: #03261d; }
-        .perm-toggle-btn { margin-top: 8px; width: 100%; border: none; padding: 8px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer; }
-        .perm-enabled { background: #dcfce7; color: #166534; }
-        .perm-disabled { background: #fee2e2; color: #991b1b; }
-        @media print {
-            body { background: #fff !important; color: #000 !important; padding: 0 !important; }
-            .top-bar, .controls-panel, .perm-toggle-btn { display: none !important; }
-            .qr-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; }
-            .qr-card { border: 1px solid #000 !important; page-break-inside: avoid; }
-        }
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 14px 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; text-decoration: none; color: #fff; font-size: 13px; }
+        .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+        .qr-card { background: #fff; color: #000; border-radius: 12px; padding: 15px; text-align: center; }
+        .qr-card img { width: 120px; height: 120px; margin: 10px 0; }
+        .btn-toggle { width: 100%; padding: 6px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; font-size: 11px; }
+        @media print { body{background:#fff; color:#000; padding:0;} .top-bar, .btn-toggle {display:none;} .qr-grid{grid-template-columns: repeat(4, 1fr); gap:10px;} .qr-card{border:1px solid #000;} }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <h2 style="color:#10b981;">📱 بەڕێوەبردنی QR کۆد و مۆڵەتی مێزەکان</h2>
-        <div style="display:flex; gap:8px;">
-            <button class="btn-action" onclick="window.print()">🖨️ چاپی هەموو QRەکان</button>
-            <a href="/admin" class="btn-action" style="background:#334155; color:#fff;">⬅️ داشبۆرد</a>
+        <h2 style="color:var(--primary); font-size:18px;" data-tr="qr">🖨️ بارکۆدی مێزەکان</h2>
+        <div style="display:flex; gap:10px;">
+            <button class="btn" style="background:var(--accent); color:#000;" onclick="window.print()">چاپکردن</button>
+            <a href="/admin" class="btn" style="background:var(--border);" data-tr="dashboard">داشبۆرد</a>
         </div>
     </div>
-
-    <div class="controls-panel">
-        <span style="font-weight:700; color:#a7f3d0;">کۆنتڕۆڵی گشتی ئۆردەرکردنی موشتەری:</span>
-        <button class="btn-action" onclick="setAllPermissions(1)">✅ کاراکردنی هەموو مێزەکان</button>
-        <button class="btn-action" style="background:#ef4444; color:#fff;" onclick="setAllPermissions(0)">⛔ ناچالاککردنی هەموو مێزەکان (تەنها بینین)</button>
-    </div>
-
     <div class="qr-grid">
         {% for num in range(1, 91) %}
         {% set is_allowed = perm_dict.get(num, 1) %}
         <div class="qr-card">
-            <div class="qr-title">مێزی {{ num }}</div>
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ base_url }}/table/{{ num }}" alt="QR Table {{ num }}">
-            <button type="button" class="perm-toggle-btn {{ 'perm-enabled' if is_allowed else 'perm-disabled' }}" id="btn-perm-{{ num }}" onclick="togglePerm({{ num }})">
-                {{ 'ئۆردەر: کراوەیە' if is_allowed else 'ئۆردەر: داخراوە (تەنها بینین)' }}
-            </button>
+            <div style="font-weight:bold;">مێزی {{ num }}</div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ base_url }}/table/{{ num }}">
+            <button class="btn-toggle" style="background:{{ '#dcfce7' if is_allowed else '#fee2e2' }}; color:{{ '#166534' if is_allowed else '#991b1b' }};" onclick="tog({{ num }}, this)">{{ 'کراوەیە' if is_allowed else 'داخراوە' }}</button>
         </div>
         {% endfor %}
     </div>
-
     <script>
-        function togglePerm(tableNum) {
-            fetch('/toggle_table_permission', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ table_number: tableNum })
-            }).then(r => r.json()).then(data => {
-                if (data.status === 'success') {
-                    const btn = document.getElementById('btn-perm-' + tableNum);
-                    if (data.allow_ordering) {
-                        btn.innerText = 'ئۆردەر: کراوەیە';
-                        btn.className = 'perm-toggle-btn perm-enabled';
-                    } else {
-                        btn.innerText = 'ئۆردەر: داخراوە (تەنها بینین)';
-                        btn.className = 'perm-toggle-btn perm-disabled';
-                    }
-                }
-            });
-        }
-
-        function setAllPermissions(allow) {
-            if (confirm(allow ? "ئایا هەموو مێزەکان ڕێگەی ئۆردەریان پێبدرێت؟" : "ئایا هەموو مێزەکان ببنە تەنها بینین؟")) {
-                fetch('/set_all_table_permissions', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ allow_ordering: allow })
-                }).then(r => r.json()).then(data => {
-                    if (data.status === 'success') location.reload();
-                });
-            }
+        function tog(t, btn) {
+            fetch('/toggle_table_permission', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:t}) })
+            .then(r=>r.json()).then(d=>{ if(d.status==='success'){ btn.innerText=d.allow_ordering?'کراوەیە':'داخراوە'; btn.style.background=d.allow_ordering?'#dcfce7':'#fee2e2'; btn.style.color=d.allow_ordering?'#166534':'#991b1b'; } });
         }
     </script>
 </body>
 </html>
 """
 
-# ==========================================
-# تێمپلێتەکانی ئایپاد و دیسکتۆپ
-# ==========================================
-DESKTOP_TABLES_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="ckb" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>هەڵبژاردنی مێز - دیوانی سوڵتان</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        html, body { background-color: #03261d; color: #ffffff; min-height: 100%; height: auto; overflow-x: hidden; overflow-y: scroll; }
-        .header-bar { background-color: #064032; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0b5e4a; position: sticky; top: 0; z-index: 1000; }
-        .header-title { font-size: 16px; font-weight: 800; color: #ffffff; text-align: center; flex: 1; }
-        .header-actions { display: flex; gap: 8px; align-items: center; }
-        .btn-header { color: #ffffff; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 800; text-decoration: none; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        .btn-takeaway-hdr { background-color: #0284c7; border: 1.5px solid #38bdf8; }
-        .btn-qr-mgr { background-color: #3b82f6; }
-        .btn-exit { background-color: #ef4444; }
-
-        .tables-grid-wrapper { padding: 20px 20px 80px 20px; width: 100%; max-width: 1500px; margin: 0 auto; }
-        .tables-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 12px; width: 100%; }
-        .table-box { background-color: #ffffff; border: 2px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: #03261d; text-decoration: none; height: 90px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .table-box.active-occupied { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; color: #ffffff !important; border-color: #047857 !important; }
-        
-        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .modal-box { background: #064032; border: 2px solid #0b5e4a; border-radius: 16px; width: 100%; max-width: 440px; padding: 24px; color: #fff; }
-        .modal-box input { width: 100%; padding: 12px; background: #03261d; border: 1.5px solid #0b5e4a; border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 12px; outline: none; }
-        @media (max-width: 900px) { .tables-grid { grid-template-columns: repeat(8, 1fr); gap: 10px; } .table-box { height: 80px; font-size: 24px; } }
-    </style>
-</head>
-<body>
-    <div class="header-bar">
-        <a href="/logout" class="btn-header btn-exit">✕ دەرچوون</a>
-        <div class="header-title">تکایە بۆ ئۆردەرکردنی خواردن و خواردنەوە مێزێک دیاری بکە!</div>
-        <div class="header-actions">
-            {% if session.get('role') == 'admin' %}
-            <a href="/admin" class="btn-header" style="background-color:#10b981;">👑 داشبۆرد</a>
-            {% endif %}
-            <button type="button" class="btn-header btn-takeaway-hdr" onclick="document.getElementById('takeawayModal').style.display='flex'">🥡 سەفەری</button>
-            <a href="/qr_manager" class="btn-header btn-qr-mgr">📱 بەڕێوەبردنی QR</a>
-        </div>
-    </div>
-
-    <div class="tables-grid-wrapper">
-        <div class="tables-grid" id="tablesGrid">
-            {% for num in range(1, 91) %}
-                <a href="/desktop?table={{ num }}" class="table-box" id="tbl-box-{{ num }}">{{ num }}</a>
-            {% endfor %}
-            {% for t in active_takeaways %}
-                <a href="/desktop?table={{ t|urlencode }}" class="table-box active-occupied" style="font-size: 16px; flex-direction: column; gap: 4px; padding: 4px; text-align: center; line-height: 1.2;">
-                    <span style="font-size: 20px;">🛵</span>
-                    <span style="font-size: 13px;">{{ t.replace('سەفەری (', '').replace(')', '') }}</span>
-                </a>
-            {% endfor %}
-        </div>
-    </div>
-
-    <div class="modal" id="takeawayModal">
-        <div class="modal-box">
-            <h3 style="color:#38bdf8; margin-bottom:14px; text-align:center;">🥡 تۆمارکردنی داواکاری سەفەری</h3>
-            <label style="font-size:12px; color:#a7f3d0;">ناوی موشتەری:</label>
-            <input type="text" id="custName" placeholder="بۆ نموونە: ئەحمەد">
-            
-            <label style="font-size:12px; color:#a7f3d0;">ژمارەی مۆبایل:</label>
-            <input type="text" id="custPhone" placeholder="0770xxxxxxx">
-            
-            <label style="font-size:12px; color:#a7f3d0;">ناونیشان (ئەگەر دلیڤەری بێت):</label>
-            <input type="text" id="custAddress" placeholder="گەڕەک، شەقام، خانوو">
-            
-            <button type="button" class="btn-header btn-takeaway-hdr" onclick="startTakeawayOrder()" style="margin-top:10px; font-size:15px; padding:12px; width:100%; justify-content:center;">دەستپێکردنی ئۆردەر ➔</button>
-            <button type="button" onclick="document.getElementById('takeawayModal').style.display='none'" style="background:none; border:none; color:#94a3b8; width:100%; margin-top:10px; cursor:pointer;">پاشگەزبوونەوە</button>
-        </div>
-    </div>
-
-<script>
-        function startTakeawayOrder() {
-            let name = document.getElementById('custName').value.trim() || 'کڕیار';
-            let phone = document.getElementById('custPhone').value.trim();
-            let addr = document.getElementById('custAddress').value.trim();
-            let idStr = "سەفەری (" + name;
-            if(phone) idStr += " - " + phone;
-            if(addr) idStr += " - " + addr;
-            idStr += ")";
-            window.location.href = "/desktop?table=" + encodeURIComponent(idStr);
-        }
-
-function refreshTableStatus() {
-            // سەرەتا داتای مێزە پڕەکان دەهێنین
-            fetch('/get_active_tables?t=' + new Date().getTime())
-                .then(r => r.json())
-                .then(activeTables => {
-                    // پاشان پەڕەکە دەهێنین
-                    fetch(window.location.href)
-                        .then(res => res.text())
-                        .then(html => {
-                            let parser = new DOMParser();
-                            let doc = parser.parseFromString(html, 'text/html');
-                            let newGrid = doc.getElementById('tablesGrid');
-                            
-                            if (newGrid) {
-                                // پێش ئەوەی بیخەینە سەر شاشەکە، ڕەنگەکان جێبەجێ دەکەین
-                                for (let i = 1; i <= 90; i++) {
-                                    const box = newGrid.querySelector('#tbl-box-' + i);
-                                    if (box) {
-                                        if (activeTables.includes(i.toString())) {
-                                            box.classList.add('active-occupied');
-                                        } else {
-                                            box.classList.remove('active-occupied');
-                                        }
-                                    }
-                                }
-                                // ئێستا دەیخەینە سەر شاشەکە بەبێ ئەوەی سپی ببێتەوە
-                                document.getElementById('tablesGrid').innerHTML = newGrid.innerHTML;
-                            }
-                        }).catch(() => {});
-                }).catch(() => {});
-        }
-        
-        refreshTableStatus(); // بۆ دەرکەوتنی ڕەنگەکان لە سەرەتای کردنەوەی پەڕەکە
-        setInterval(refreshTableStatus, 3000);
-    </script>
-</body>
-</html>
-"""
-
-DESKTOP_TEMPLATE = """
+# ----------------- Desktop Tables -----------------
+DESKTOP_TABLES_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مێنیوی دیوانی سوڵتان - {{ selected_table }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>هەڵبژاردنی مێز</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        :root { --bg-main: #0b0f19; --bg-card: #151d30; --bg-sidebar: #101726; --gold: #f59e0b; --text-main: #f8fafc; --text-muted: #94a3b8; --border-color: #334155; --success: #10b981; --danger: #ef4444; }
-        body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .desktop-main-layout { display: grid; grid-template-columns: 1fr 480px; flex: 1; overflow: hidden; }
-        .menu-section { display: flex; flex-direction: column; padding: 16px 20px; overflow-y: auto; }
-        .categories-visual-bar { display: flex; gap: 12px; margin-bottom: 22px; overflow-x: auto; padding: 6px 4px 10px 4px; flex-shrink: 0; }
-        .cat-visual-btn { background: #151d30; border: 2px solid #334155; border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; align-items: center; min-width: 90px; cursor: pointer; }
-        .cat-visual-btn.active { background: #1e293b; border-color: var(--gold); }
-        .cat-visual-img { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; margin-bottom: 6px; }
-        .cat-visual-title { font-size: 13px; font-weight: 700; color: #f8fafc; }
-        .food-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; padding-bottom: 20px; }
-        .desktop-food-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 235px; justify-content: space-between; }
-        .desktop-food-img { width: 100%; height: 125px; border-radius: 8px; object-fit: cover; cursor: pointer; }
-        .desktop-food-info { display: flex; flex-direction: column; gap: 3px; text-align: center; }
-        .desktop-food-name { font-size: 13.5px; font-weight: 700; min-height: 36px; display: flex; align-items: center; justify-content: center; }
-        .desktop-food-price { font-size: 13px; font-weight: 800; color: var(--success); }
-        .opt-select { width: 100%; background: var(--bg-main); color: var(--gold); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px; font-size: 11px; font-weight: 700; outline: none; }
-        .cart-sidebar { background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 16px; height: 100%; overflow: hidden; }
-        .cart-top-bar { display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); padding: 8px 12px; border-radius: 10px; margin-bottom: 12px; }
-        .table-badge-header { background: var(--gold); color: var(--bg-main); padding: 5px 12px; border-radius: 6px; font-size: 14px; font-weight: 800; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .btn-top-action { background: #1e293b; color: var(--text-main); border: 1px solid var(--border-color); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: none; }
-        .cart-items-container { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-        .desktop-cart-row { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; }
-        .desktop-counter-group { display: flex; align-items: center; background: var(--bg-main); border-radius: 6px; padding: 2px; gap: 4px; }
-        .desktop-btn-count { width: 30px; height: 30px; border-radius: 6px; border: none; background: #1e293b; color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; }
-        .btn-send-desktop { flex: 2; background: linear-gradient(135deg, var(--gold) 0%, #d97706 100%); color: var(--bg-main); border: none; padding: 11px; border-radius: 8px; font-size: 14px; font-weight: 800; cursor: pointer; }
-        .btn-add-plate-desktop { flex: 1; background: #8b5cf6; color: #fff; border: none; padding: 11px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; display: none; }
-        #toastMsg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--success); color: #fff; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 1000; display: none; }
-
-        .modal-transfer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .modal-transfer-box { background: #151d30; border: 2px solid var(--border-color); border-radius: 14px; padding: 20px; width: 100%; max-width: 360px; color: #fff; text-align: center; }
+        body { padding:20px; margin: 0; overflow-y: auto; }
+        .hdr { display:flex; justify-content:space-between; margin-bottom:20px; background:var(--card); padding:15px; border-radius:12px; border:1px solid var(--border); align-items:center; }
+        .g { display:grid; grid-template-columns:repeat(8,1fr); gap:15px; max-width:1400px; margin:0 auto; }
+        .b { background:var(--card); border:1px solid var(--border); padding:20px; text-align:center; font-size:24px; font-weight:bold; color:var(--text); text-decoration:none; border-radius:12px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); height:100px; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; }
+        .b.act { background:var(--accent); color:#000; border-color:var(--accent); }
+        .btn-take { background:#3b82f6; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer; text-decoration:none; }
+        @media(max-width:900px){ .g{grid-template-columns:repeat(5,1fr); gap:10px;} .b{padding:15px; font-size:20px;} }
     </style>
 </head>
 <body>
-    <div id="toastMsg">✅ بە سەرکەوتوویی نێردرا</div>
+    <div class="hdr">
+        <a href="/logout" style="color:var(--danger); font-weight:bold; text-decoration:none;">دەرچوون ✕</a>
+        <h2 style="color:var(--primary); font-size:18px;">تکایە مێزێک هەڵبژێرە</h2>
+        <div style="display:flex; gap:10px;">
+            {% if session.get('role') == 'admin' %}<a href="/admin" class="btn-take" style="background:var(--accent); color:#000;">داشبۆرد</a>{% endif %}
+            <button class="btn-take" onclick="let n=prompt('ناوی کڕیار:'); if(n) location.href='/desktop?table='+encodeURIComponent('سەفەری ('+n+')')">سەفەری 🛵</button>
+        </div>
+    </div>
+    <div class="g" id="tg">
+        {% for n in range(1,91) %}<a href="/desktop?table={{n}}" id="tb-{{n}}" class="b">{{n}}</a>{% endfor %}
+        {% for t in active_takeaways %}<a href="/desktop?table={{t|urlencode}}" class="b act" style="font-size:14px; padding:10px;">
+            <span style="font-size: 24px;">🛵</span>
+            <span style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">{{t.replace('سەفەری (','').replace(')','')}}</span>
+        </a>{% endfor %}
+    </div>
+    <script>
+        setInterval(()=>{fetch('/get_active_tables?t='+Date.now()).then(r=>r.json()).then(a=>{for(let i=1;i<=90;i++){let e=document.getElementById('tb-'+i);if(e){if(a.includes(i.toString()))e.classList.add('act');else e.classList.remove('act');}}});},3000);
+    </script>
+</body>
+</html>
+"""
+
+# ----------------- Mobile Tables -----------------
+MOBILE_TABLES_TEMPLATE = DESKTOP_TABLES_TEMPLATE.replace('grid-template-columns:repeat(8,1fr)', 'grid-template-columns:repeat(4,1fr)').replace('/desktop', '/mobile/menu')
+
+# ----------------- Desktop POS (iPad/PC) -----------------
+DESKTOP_TEMPLATE = COMMON_HEAD + """
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS - {{ selected_table }}</title>
+    <style>
+        * { user-select: none; }
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+        .desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100vh; }
+        
+        .cart-side { width: 40%; height: 100vh; display: flex; flex-direction: column; padding: 15px; background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
+        .c-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .btn-top { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; text-decoration: none; }
+        
+        .c-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding-right: 5px; }
+        .c-row { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .c-ctrl { display: flex; align-items: center; gap: 6px; background: var(--bg); padding: 4px; border-radius: 8px; }
+        .c-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: #334155; color: #fff; font-weight: bold; font-size: 14px; cursor: pointer; }
+        .c-btn.add { background: var(--primary); color: #000; }
+        
+        .cart-bottom { flex-shrink: 0; background: var(--bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); margin-top: 5px; }
+        .c-tot { font-size: 15px; font-weight: bold; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .btn-send { background: var(--accent); color: #000; border: none; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
+
+        .menu-side { width: 60%; height: 100vh; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
+        .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
+        .cat-btn { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 5px 15px; min-width: 80px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .cat-btn.active { border-color: var(--primary); background: rgba(0,0,0,0.3); }
+        .cat-visual-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; pointer-events: none; }
+        .cat-visual-title { font-size: 11px; font-weight: bold; color: #fff; pointer-events: none; }
+
+        .food-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; overflow-y: auto; padding-right: 5px; align-content: start; padding-bottom: 20px; }
+        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; cursor: pointer; transition: 0.1s; display: flex; flex-direction: column; justify-content: space-between; min-height: 220px; }
+        .f-card:active { transform: scale(0.97); }
+        .f-img { width: 100%; height: 130px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; pointer-events: none; }
+        .f-name { font-size: 14px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
+        .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 2px; pointer-events: none; }
+        .opt-select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 4px; font-size: 11px; outline: none; }
+        
+        #toastMsg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 1000; display: none; }
+
+        .modal-transfer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+        .modal-transfer-box { background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 20px; width: 100%; max-width: 360px; color: #fff; text-align: center; }
+    </style>
+</head>
+<body dir="rtl">
+    <div id="toastMsg">✅ نێردرا</div>
+    
     <div class="desktop-main-layout">
-        <div class="menu-section">
-            <div class="categories-visual-bar">
-                <div class="cat-visual-btn active" onclick="filterCat('all', this)">
-                    <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=140" class="cat-visual-img">
-                    <span class="cat-visual-title">هەموو</span>
+        <div class="cart-side">
+            <div class="c-header">
+                <div style="background:var(--primary); color:#000; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:13px;">📍 {{ selected_table }}</div>
+                <div style="display:flex; gap:5px;">
+                    <button type="button" class="btn-top" style="background:#3b82f6;" onclick="openTransferModal()">🔄 گواستنەوە</button>
+                    <a href="/desktop/tables" class="btn-top">گەڕانەوە</a>
+                    <button class="btn-top" style="color:var(--danger);" onclick="clrT()">سڕینەوە</button>
                 </div>
-                {% for cat, items in categories.items() %}
-                    <div class="cat-visual-btn" onclick="filterCat('cat-group-{{ loop.index }}', this)">
-                        <img src="{{ items[0].image_path if items[0].image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=140' }}" class="cat-visual-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=140'">
-                        <span class="cat-visual-title">{{ cat }}</span>
-                    </div>
-                {% endfor %}
             </div>
             
-            <div class="menu-container-desktop">
-                {% for cat, items in categories.items() %}
-                <div class="category-desktop-group category-group-item" id="cat-group-{{ loop.index }}">
-                    <div class="food-grid">
-                        {% for item in items %}
-                        {% set d_safe = item.id %}
-                        <div class="desktop-food-card">
-                            <img src="{{ item.image_path if item.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="desktop-food-img" onclick="addFromDesktopCard('{{ item.food_name | replace("'", "\\'") }}', {{ item.price }}, '{{ (item.category or '') | replace("'", "\\'") }}', '{{ d_safe }}')" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'">
-                            <div class="desktop-food-info">
-                                <div class="desktop-food-name">{{ item.food_name }}</div>
-                                <div class="desktop-food-price">{{ "{:,.0f}".format(item.price) }} دینار</div>
-                            </div>
-                            
-                            {% set cat_str = item.category or '' %}
-                            {% set c_name = cat_str | replace('ي', 'ی') | trim %}
-
-                            {% set show_r = ('کوڵاو' in c_name or 'پەلەوەر' in c_name or 'کورد' in c_name) %}
-                            {% set show_c = ('پەلەوەر' in c_name or 'مریشک' in c_name) %}
-
-                            {% if show_r or show_c %}
-                            <div style="display:flex; flex-direction:row; gap:4px; width:100%;">
-                                {% if show_r %}
-                                <select class="opt-select" id="d_rice_{{ d_safe }}" style="flex:1; min-width:0;">
-                                    <option value="">ج. برنج</option>
-                                    <option value="برنجی درێژ">برنجی درێژ</option>
-                                    <option value="برنجی خڕ">برنجی خڕ</option>
-                                    <option value="برنجی کوردی">برنجی کوردی</option>
-                                    <option value="برنج بە سرکە">برنج بە سرکە</option>
-                                </select>
-                                {% endif %}
-                                {% if show_c %}
-                                <select class="opt-select" id="d_chick_{{ d_safe }}" style="flex:1; min-width:0;">
-                                    <option value="">ب. مریشک</option>
-                                    <option value="سینگ">سینگ</option>
-                                    <option value="ڕان">ڕان</option>
-                                </select>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
+            <div class="c-list" id="cList"></div>
+            
+            <div class="cart-bottom">
+                <div class="c-tot"><span>کۆی گشتی:</span><span id="totTxt">0</span></div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-send" style="background:#8b5cf6; flex:1; display:none; color:#fff;" id="btnDiv" onclick="addDiv()">+ هێڵ</button>
+                    <button class="btn-send" style="flex:2;" onclick="sendO()">ناردن ➔</button>
                 </div>
-                {% endfor %}
             </div>
         </div>
 
-        <div class="cart-sidebar">
-            <div class="cart-top-bar">
-                <div class="table-badge-header">📍 {{ selected_table }}</div>
-                <input type="hidden" id="currentTableNum" value="{{ selected_table }}">
-                <div style="display:flex; gap:4px;">
-                    <button type="button" class="btn-top-action" style="background:#3b82f6;" onclick="openTransferModal()">🔄 گواستنەوە</button>
-                    <a href="/desktop/tables" class="btn-top-action">⬅️ گەڕانەوە</a>
-                    <button type="button" class="btn-top-action" style="color:var(--danger);" onclick="clearCurrentTableOrders()">🗑 سڕینەوە</button>
+        <div class="menu-side">
+            <div class="cat-bar">
+                <div class="cat-btn active" onclick="fCat('all', this)">
+                    <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=140" class="cat-visual-img">
+                    <span class="cat-visual-title" data-tr="all">هەموو</span>
                 </div>
+                {% for cat, items in categories.items() %}
+                <div class="cat-btn" onclick="fCat('cat-{{ loop.index }}', this)">
+                    <img src="{{ items[0].image_path if items[0].image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=140' }}" class="cat-visual-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=140'">
+                    <span class="cat-visual-title">{{ cat }}</span>
+                </div>
+                {% endfor %}
             </div>
-            <div class="cart-items-container" id="cartItemsList"></div>
-            <div style="border-top:1px solid var(--border-color); padding-top:10px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-weight:800;">
-                    <span>کۆی گشتی:</span>
-                    <span id="cartTotalTxt" style="color:var(--success); font-size:18px;">0 دینار</span>
+            <div class="food-grid" id="fGrid">
+                {% for cat, items in categories.items() %}
+                {% set cat_idx = loop.index %}
+                {% for it in items %}
+                {% set c_name = (it.category or '') | replace('ي', 'ی') | trim %}
+                {% set show_fish = ('ماسی' in c_name or 'ماسی' in it.food_name) %}
+                <div class="f-card cat-item cat-{{ cat_idx }}" onclick="addF('{{ it.food_name | replace("'", "\\'") }}', {{ it.price }}, '{{ (it.category or '') | replace("'", "\\'") }}', {{ it.id }})">
+                    <img src="{{ it.image_path if it.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="f-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'">
+                    <div class="f-name food-title-disp" data-ku="{{ it.food_name }}" data-ar="{{ it.food_name_ar or it.food_name }}" data-en="{{ it.food_name_en or it.food_name }}">{{ it.food_name }}</div>
+                    <div class="f-price">{{ "{:,.0f}".format(it.price) }}</div>
+                    
+                    {% set show_r = ('کوڵاو' in c_name or 'پەلەوەر' in c_name or 'کورد' in c_name) %}
+                    {% set show_c = ('پەلەوەر' in c_name or 'مریشک' in c_name) %}
+                    {% if show_r or show_c or show_fish %}
+                    <div style="display:flex; gap:4px; width:100%;">
+                        {% if show_fish %}
+                        <input type="number" id="w_{{it.id}}" class="opt-select" step="0.25" min="0.25" value="1" onclick="event.stopPropagation()" placeholder="کێش">
+                        {% endif %}
+                        {% if show_r %}<select class="opt-select" id="r_{{it.id}}" onclick="event.stopPropagation()"><option value="">ج. برنج</option><option value="درێژ">درێژ</option><option value="خڕ">خڕ</option><option value="کوردی">کوردی</option></select>{% endif %}
+                        {% if show_c %}<select class="opt-select" id="c_{{it.id}}" onclick="event.stopPropagation()"><option value="">ب. مریشک</option><option value="سینگ">سینگ</option><option value="ڕان">ڕان</option></select>{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
-                <div style="display:flex; gap:8px;">
-                    <!-- دوگمەی هێڵی جیاکەرەوە گەڕێندرایەوە -->
-                    <button type="button" id="btnAddPlateDesktop" class="btn-add-plate-desktop" onclick="addNewPlateDivider()">➕ هێڵی جیاکەرەوە</button>
-                    <button type="button" id="btnSubmitDesktop" class="btn-send-desktop" onclick="submitFinalOrder()">ناردن بۆ مەتبەخ ➔</button>
-                </div>
+                {% endfor %}
+                {% endfor %}
             </div>
         </div>
     </div>
 
     <div class="modal-transfer" id="transferModal">
         <div class="modal-transfer-box">
-            <h3 style="color:var(--gold); margin-bottom:12px;">گواستنەوە بۆ مێزێکی تر</h3>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">مێزی نوێ هەڵبژێرە بۆ گواستنەوەی هەموو داواکارییەکان:</p>
-            <select id="newTableSelect" style="width:100%; padding:10px; background:var(--bg-main); border:1px solid var(--border-color); color:#fff; border-radius:8px; font-weight:bold; margin-bottom:14px;">
+            <h3 style="color:var(--primary); margin-bottom:12px;">گواستنەوە بۆ مێزێکی تر</h3>
+            <select id="newTableSelect" style="width:100%; padding:10px; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px; margin-bottom:14px;">
                 {% for n in range(1, 91) %}
                     <option value="{{ n }}">مێزی {{ n }}</option>
                 {% endfor %}
             </select>
-            <button type="button" onclick="confirmTransferTable()" style="background:var(--success); border:none; color:#fff; padding:10px; border-radius:8px; font-weight:bold; width:100%; cursor:pointer;">پشتڕاستکردنەوە و گواستنەوە</button>
-            <button type="button" onclick="closeTransferModal()" style="background:none; border:none; color:#94a3b8; margin-top:10px; cursor:pointer;">داخستن</button>
+            <button type="button" onclick="confirmTransferTable()" style="background:var(--accent); color:#000; padding:10px; border:none; border-radius:8px; font-weight:bold; width:100%;">پشتڕاستکردنەوە</button>
+            <button type="button" onclick="closeTransferModal()" style="background:none; border:none; color:#94a3b8; width:100%; margin-top:10px; cursor:pointer;">داخستن</button>
         </div>
     </div>
 
     <script>
-        let cartItems = [], originalTableOrders = [];
-        const tableNum = document.getElementById('currentTableNum').value;
+        let cart = [], orig = []; const tbl = "{{ selected_table }}";
 
-        function showToast(text, isError = false) {
-            const toast = document.getElementById('toastMsg');
-            toast.innerText = text;
-            toast.style.background = isError ? 'var(--danger)' : 'var(--success)';
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 2200);
+        window.addEventListener('langChanged', () => {
+            let l = window.savedLang;
+            document.querySelectorAll('.food-title-disp').forEach(el => {
+                el.innerText = el.getAttribute('data-' + l) || el.getAttribute('data-ku');
+            });
+            ren();
+        });
+
+        function fCat(id, btn) {
+            document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+            document.querySelectorAll('.cat-item').forEach(i => { i.style.display = (id==='all' || i.classList.contains(id)) ? 'flex' : 'none'; });
         }
 
-        function checkHasGrill() {
-            let hasGrill = cartItems.some(i => !i.is_divider && (i.cat === 'برژاو' || i.food_name.includes('کەباب') || i.food_name.includes('تکە')));
-            document.getElementById('btnAddPlateDesktop').style.display = hasGrill ? 'block' : 'none';
-        }
-
-        function addNewPlateDivider() {
-            if (cartItems.length === 0 || (cartItems[cartItems.length - 1] && cartItems[cartItems.length - 1].is_divider)) return;
-            cartItems.push({ is_divider: true, food_name: '─── قاپی نوێ ───', price: 0, qty: 1, cat: 'برژاو' });
-            renderCart();
-            checkHasGrill();
-        }
-
-        function addFromDesktopCard(baseName, price, cat, safeId) {
-            let rEl = document.getElementById('d_rice_' + safeId);
-            let cEl = document.getElementById('d_chick_' + safeId);
+        function addF(n, p, c, id) {
+            let fn = n, pts = [];
+            let rel = document.getElementById('r_'+id), cel = document.getElementById('c_'+id);
+            if(rel && rel.value) pts.push(rel.value);
+            if(cel && cel.value) pts.push(cel.value);
+            if(pts.length>0) fn += ` (${pts.join(' - ')})`;
             
-            let fullName = baseName;
-            let parts = [];
-            
-            if (rEl && rEl.value) parts.push(rEl.value.trim());
-            if (cEl && cEl.value) parts.push(cEl.value.trim());
-            
-            if (parts.length > 0) {
-                fullName += ` (${parts.join(' - ')})`;
+            let qtyToAdd = 1;
+            let wEl = document.getElementById('w_'+id);
+            if(wEl && wEl.value) {
+                let w = parseFloat(wEl.value);
+                if(!isNaN(w) && w > 0) qtyToAdd = w;
             }
-            
-            updateQty(fullName, 1, price, cat);
+
+            let fd = false;
+            for(let i=cart.length-1; i>=0; i--) {
+                if(cart[i].is_divider) break;
+                if(cart[i].ku === fn) { cart[i].qty += qtyToAdd; fd=true; break; }
+            }
+            if(!fd) cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:qtyToAdd, cat:c});
+            ren();
         }
 
-        function updateQty(foodName, change, price, cat) {
-            let found = false;
-            for (let i = cartItems.length - 1; i >= 0; i--) {
-                if (cartItems[i].is_divider) break; // تەنها لە هەمان قاپ دەگەڕێت و تێکەڵی ناکات
-                if (cartItems[i].food_name === foodName) {
-                    cartItems[i].qty += change;
-                    if (cartItems[i].qty <= 0) cartItems.splice(i, 1);
-                    found = true;
-                    break;
-                }
+        function updQ(idx, d) { 
+            let oQ = orig.find(o=>o.ku===cart[idx].ku && !o.is_divider); oQ = oQ?oQ.qty:0;
+            let nQ = cart[idx].qty + d;
+            cart[idx].qty = nQ; 
+            if(cart[idx].qty <= 0) cart.splice(idx, 1); 
+            ren(); 
+        }
+        function delI(idx) { cart.splice(idx, 1); ren(); }
+
+        function editNote(idx) {
+            let note = prompt('تێبینی (بۆ نموونە: بێ پیاز):');
+            if (note && note.trim() !== '') {
+                cart[idx].ku += ' (' + note.trim() + ')';
+                cart[idx].full_name = cart[idx].ku;
+                ren();
             }
-            if (!found && change > 0) cartItems.push({ is_divider: false, food_name: foodName, price: price, qty: 1, cat: cat || '' });
-            checkHasGrill();
-            renderCart();
         }
 
-        function renderCart() {
-            const list = document.getElementById('cartItemsList');
-            list.innerHTML = '';
-            if (cartItems.length === 0) {
-                list.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px 0;">سەبەتە بەتاڵە</div>';
-                document.getElementById('cartTotalTxt').innerText = '0 دینار';
-                return;
-            }
-            let total = 0, plateNum = 1;
-            cartItems.forEach((item, index) => {
-                if (item.is_divider || item.food_name.includes('قاپی نوێ')) {
-                    plateNum++;
-                    list.innerHTML += `<div style="background:#8b5cf6; padding:6px 10px; border-radius:8px; font-size:12px; font-weight:800; display:flex; justify-content:space-between; margin-bottom:8px;"><span>🍽 هێڵی جیاکەرەوە (قاپی ${plateNum})</span><button onclick="cartItems.splice(${index},1); renderCart(); checkHasGrill();" style="background:#ef4444; border:none; color:#fff; border-radius:4px; padding:2px 6px;">✕</button></div>`;
+        function addDiv() {
+            if(cart.length===0 || (cart[cart.length-1] && cart[cart.length-1].is_divider)) return;
+            cart.push({is_divider:true, ku:'─── قاپی نوێ ───', full_name:'───', price:0, qty:1, cat:''}); ren();
+        }
+
+        function ren() {
+            let h = '', tot = 0, pN = 1, hG = false;
+            let l = window.savedLang;
+            cart.forEach((it, i) => {
+                if(it.is_divider) {
+                    pN++; h += `<div style="background:#8b5cf6; padding:8px; border-radius:6px; font-size:13px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:5px;"><span>🍽 قاپی ${pN}</span><span onclick="delI(${i})" style="cursor:pointer; background:#ef4444; padding:2px 8px; border-radius:4px; color:#fff;">✕</span></div>`;
                 } else {
-                    total += item.qty * item.price;
-                    list.innerHTML += `<div class="desktop-cart-row" style="margin-bottom:8px;"><div style="display:flex; justify-content:space-between; align-items:center;"><div class="desktop-counter-group"><button class="desktop-btn-count" onclick="updateQty('${item.food_name.replace(/'/g, "\\'")}', -1, ${item.price}, '${item.cat.replace(/'/g, "\\'")}')">-</button><span style="padding:0 8px; font-weight:800;">${item.qty}</span><button class="desktop-btn-count" style="background:var(--gold); color:#000;" onclick="updateQty('${item.food_name.replace(/'/g, "\\'")}', 1, ${item.price}, '${item.cat.replace(/'/g, "\\'")}')">+</button></div><div style="text-align:left;"><div style="font-weight:800; font-size:13px;">${item.food_name}</div><div style="color:var(--success); font-size:11px;">${(item.qty * item.price).toLocaleString()} دینار</div></div></div></div>`;
+                    if(it.cat==='برژاو' || it.ku.includes('کەباب')) hG = true;
+                    tot += it.price * it.qty;
+                    let dName = it[l] || it.ku;
+                    
+                    h += `<div class="c-row">
+                        <div style="flex:1; text-align:right; font-size:13px; font-weight:bold; padding-left:10px;">${dName}</div>
+                        <div class="c-ctrl">
+                            <span style="color:var(--accent); font-size:12px; font-weight:bold; margin-left:10px;">${(it.price*it.qty).toLocaleString()}</span>
+                            <button class="c-btn" style="background:#ef4444; font-size:12px;" onclick="delI(${i})">🗑</button>
+                            <button class="c-btn" style="background:#3b82f6; font-size:12px;" onclick="editNote(${i})">✏️</button>
+                            <button class="c-btn" onclick="updQ(${i},-1)">-</button>
+                            <span style="width:30px;text-align:center;font-weight:bold;font-size:14px;">${parseFloat(it.qty.toFixed(3))}</span>
+                            <button class="c-btn add" onclick="updQ(${i},1)">+</button>
+                        </div>
+                    </div>`;
                 }
             });
-            document.getElementById('cartTotalTxt').innerText = total.toLocaleString() + ' دینار';
+            document.getElementById('cList').innerHTML = h;
+            document.getElementById('totTxt').innerText = tot.toLocaleString();
+            document.getElementById('btnDiv').style.display = hG ? 'block' : 'none';
         }
 
-        function filterCat(catId, btn) {
-            document.querySelectorAll('.cat-visual-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.querySelectorAll('.category-group-item').forEach(g => {
-                g.style.display = (catId === 'all' || g.id === catId) ? 'block' : 'none';
-            });
+        function sendO() {
+            if(cart.length===0) return;
+            let fCart = cart.map(it => ({ is_divider: it.is_divider, food_name: it.ku, qty: it.qty, price: it.price, cat: it.cat || 'گشتی' }));
+            fetch('/save_cart_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:tbl, cart_items:fCart, original_items:orig}) })
+            .then(r=>r.json()).then(d=>{ if(d.status==='success') location.href='/desktop/tables'; else alert('هەڵە'); });
         }
 
-        function fetchTableOrders() {
-            fetch('/get_table_orders/' + encodeURIComponent(tableNum)).then(r => r.json()).then(data => {
-                cartItems = []; originalTableOrders = [];
-                if (data && data.length > 0) {
-                    data.forEach(item => {
-                        let isDiv = item.food_name.includes('قاپی نوێ') || item.food_name.includes('───');
-                        let it = { is_divider: isDiv, food_name: item.food_name, qty: parseInt(item.quantity), price: parseFloat(item.price), cat: item.category || '' };
-                        cartItems.push(it); originalTableOrders.push(JSON.parse(JSON.stringify(it)));
-                    });
-                }
-                checkHasGrill();
-                renderCart();
-            });
-        }
-
-        function submitFinalOrder() {
-            if (cartItems.length === 0) { showToast("تکایە سەرەتا خواردن دیاری بکە!", true); return; }
-            fetch('/save_cart_order', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ table_number: tableNum, cart_items: cartItems, original_items: originalTableOrders })
-            }).then(r => r.json()).then(data => {
-                if (data.status === 'success') {
-                    showToast("✅ داواکارییەکە بۆ مەتبەخ نێردرا");
-                    setTimeout(() => { window.location.href = '/desktop/tables'; }, 800);
-                }
-            });
-        }
-
-        function clearCurrentTableOrders() {
-            if (confirm("ئایا دڵنیایت لە سڕینەوە؟")) {
-                fetch('/clear_table_orders', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ table_number: tableNum }) })
-                .then(() => fetchTableOrders());
-            }
+        function clrT() {
+            if(confirm('سڕینەوە؟')) fetch('/clear_table_orders', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:tbl})}).then(()=>location.reload());
         }
 
         function openTransferModal() { document.getElementById('transferModal').style.display = 'flex'; }
         function closeTransferModal() { document.getElementById('transferModal').style.display = 'none'; }
         function confirmTransferTable() {
             let target = document.getElementById('newTableSelect').value;
-            if (target === tableNum) { alert("مێزی مەبەست ناتوانێت هەمان مێز بێت!"); return; }
+            if (target === tbl) { alert("هەمان مێزە!"); return; }
             fetch('/transfer_table_orders', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ from_table: tableNum, to_table: target })
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ from_table: tbl, to_table: target })
             }).then(r => r.json()).then(res => {
-                if(res.status === 'success') {
-                    showToast("مێزەکە بەسەرکەوتوویی گوازرایەوە");
-                    setTimeout(() => { window.location.href = '/desktop?table=' + target; }, 800);
-                } else { alert("هەڵە: " + res.message); }
+                if(res.status === 'success') location.href = '/desktop?table=' + target;
+                else alert(res.message);
             });
         }
 
-        window.onload = function() { fetchTableOrders(); };
+        fetch('/get_table_orders/'+encodeURIComponent(tbl)).then(r=>r.json()).then(d=>{
+            if(d) {
+                d.forEach(it=>{
+                    let o = {is_divider:it.food_name.includes('───'), ku:it.food_name, full_name:it.food_name, price:parseFloat(it.price), qty:parseFloat(it.quantity), cat:it.category};
+                    cart.push(o); orig.push(JSON.parse(JSON.stringify(o)));
+                });
+                ren();
+            }
+        });
     </script>
 </body>
 </html>
 """
-# ==========================================
-# تێمپلێتەکانی مۆبایل و موشتەری
-# ==========================================
-MOBILE_TABLES_TEMPLATE = """
+
+# ----------------- Mobile POS (Customer/Waiter) -----------------
+CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>هەڵبژاردنی مێز - مۆبایل</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700;800&display=swap" rel="stylesheet">
+    <title>مێنیو - {{ table_num }}</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #03261d; color: #ffffff; min-height: 100vh; padding: 12px; }
-        .m-header { display: flex; justify-content: space-between; align-items: center; background: #064032; padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #0b5e4a; }
-        .m-title { font-size: 15px; font-weight: 800; color: #10b981; }
-        .btn-logout { background: #ef4444; color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 8px; font-weight: 800; font-size: 12px; }
+        * { user-select: none; }
+        body { background: var(--bg); color: var(--text); padding-bottom: {{ '115px' if allow_ordering else '30px' }}; min-height: 100vh; }
+        .hdr { background: var(--card); padding: 12px 15px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .pill { background: var(--primary); color: #000; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .cats { display: flex; overflow-x: auto; gap: 8px; padding: 10px 15px; }
+        .c-btn { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 5px 15px; white-space: nowrap; font-size: 12px; font-weight: bold; display: flex; flex-direction: column; align-items: center; }
+        .c-btn.act { border-color: var(--primary); background: rgba(0,0,0,0.3); color: var(--primary); }
+        .cat-visual-img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; }
         
-        .btn-takeaway-mobile { width: 100%; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; border: 2px solid #38bdf8; padding: 12px; border-radius: 10px; font-size: 15px; font-weight: 800; cursor: pointer; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .f-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 15px; }
+        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; }
+        .f-img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
+        .f-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+        .f-price { color: var(--accent); font-weight: bold; font-size: 12px; margin-bottom: 8px; }
+        .opt-select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--primary); border-radius:6px; padding:4px; font-size:11px; outline:none; margin-bottom:6px; }
+        .stp { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 2px; }
+        .s-btn { width: 30px; height: 30px; border: none; border-radius: 6px; background: #334155; color: #fff; font-weight: bold; font-size: 18px; }
+        .s-btn.add { background: var(--primary); color: #000; }
+        .btm-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); padding: 15px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 200; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; align-items: flex-end; z-index: 300; }
+        .m-box { background: var(--bg); width: 100%; max-height: 85vh; border-radius: 20px 20px 0 0; padding: 20px; display: flex; flex-direction: column; border-top: 2px solid var(--primary); }
+        .m-list { flex: 1; overflow-y: auto; margin-bottom: 15px; }
+        .c-row { background: var(--card); border: 1px solid var(--border); padding: 10px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .btn-send { background: var(--accent); color: #000; border: none; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 15px; width: 100%; }
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 13px; display: none; z-index: 1000; }
         
-        .tables-grid-mobile { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        .m-table-btn { background: #ffffff; color: #03261d; border-radius: 12px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; text-decoration: none; box-shadow: 0 3px 6px rgba(0,0,0,0.3); border: 2px solid #e2e8f0; }
-        .m-table-btn.active-occupied { background: #10b981 !important; color: #ffffff !important; border-color: #047857 !important; }
-        .t-sub { font-size: 10px; font-weight: 700; margin-top: 2px; }
-        
-        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .modal-box { background: #064032; border: 2px solid #0b5e4a; border-radius: 16px; width: 100%; max-width: 380px; padding: 20px; color: #fff; }
-        .modal-box input { width: 100%; padding: 10px; background: #03261d; border: 1.5px solid #0b5e4a; border-radius: 8px; color: #fff; font-size: 13px; margin-bottom: 10px; outline: none; }
+        .wl-lang-btn { background: var(--card); border: 2px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 10px; font-weight: bold; font-size:14px; cursor:pointer; }
+        .wl-lang-btn.active { border-color: var(--primary); background: rgba(0,0,0,0.3); color: var(--primary); }
     </style>
 </head>
 <body>
-    <div class="m-header">
-        <div class="m-title">📱 مێزەکان (گارسۆنی مۆبایل)</div>
-        <a href="/logout" class="btn-logout">✕ دەرچوون</a>
-    </div>
-
-    <button type="button" class="btn-takeaway-mobile" onclick="document.getElementById('mTakeawayModal').style.display = 'flex'">
-        <span>🥡</span>
-        <span>ئۆردەری نوێی سەفەری / دلیڤەری</span>
-    </button>
-
-<div class="tables-grid-mobile" id="tablesGridMobile">
-{% for num in range(1, 91) %}
-            <a href="/mobile/menu?table={{ num }}" class="m-table-btn" id="m-tbl-{{ num }}">
-                <span>{{ num }}</span>
-                <span class="t-sub">مێز</span>
-            </a>
-        {% endfor %}
-        {% for t in active_takeaways %}
-            <a href="/mobile/menu?table={{ t|urlencode }}" class="m-table-btn active-occupied" style="font-size: 12px; text-align: center; padding: 4px;">
-                <span>🛵</span>
-                <span style="font-size: 10px; margin-top: 4px;">{{ t.replace('سەفەری (', '').replace(')', '') }}</span>
-            </a>
-        {% endfor %}
-    </div>
-
-    <div class="modal" id="mTakeawayModal">
-        <div class="modal-box">
-            <h3 style="color:#38bdf8; margin-bottom:12px; text-align:center;">🥡 ئۆردەری نوێی سەفەری</h3>
-            <input type="text" id="mCustName" placeholder="ناوی کڕیار">
-            <input type="text" id="mCustPhone" placeholder="ژمارەی مۆبایل">
-            <input type="text" id="mCustAddress" placeholder="ناونیشان">
-            <button type="button" class="btn-takeaway-mobile" onclick="startMobileTakeaway()" style="margin-top:6px;">دەستپێکردن ➔</button>
-            <button type="button" onclick="document.getElementById('mTakeawayModal').style.display='none'" style="background:none; border:none; color:#94a3b8; width:100%; margin-top:8px; cursor:pointer;">پاشگەزبوونەوە</button>
+    <div id="welcomeOverlay" style="position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
+        <h1 style="color:var(--primary); margin-bottom:10px;">✨ چێشتماڵە</h1>
+        <h3 style="color:var(--text); margin-bottom:30px; font-size:16px;">بەخێربێیت بۆ مێزی {{ table_num }}</h3>
+        
+        <p style="color:var(--text); margin-bottom:15px; font-size:14px;">تکایە زمانێک هەڵبژێرە / Select Language</p>
+        <div style="display:flex; gap:10px; margin-bottom:40px;">
+            <button class="wl-lang-btn" onclick="selWLang('ku', this)">کوردی</button>
+            <button class="wl-lang-btn" onclick="selWLang('ar', this)">العربية</button>
+            <button class="wl-lang-btn" onclick="selWLang('en', this)">English</button>
         </div>
+        
+        <button onclick="closeWelcome()" style="background:var(--accent); color:#000; padding:15px; border:none; border-radius:12px; font-size:18px; font-weight:bold; width:100%; max-width:300px; cursor:pointer;">بەردەوامبە ➔</button>
     </div>
 
-<script>
-        function startMobileTakeaway() {
-            let name = document.getElementById('mCustName').value.trim() || 'کڕیار';
-            let phone = document.getElementById('mCustPhone').value.trim();
-            let addr = document.getElementById('mCustAddress').value.trim();
-            let idStr = "سەفەری (" + name;
-            if(phone) idStr += " - " + phone;
-            if(addr) idStr += " - " + addr;
-            idStr += ")";
-            window.location.href = "/mobile/menu?table=" + encodeURIComponent(idStr);
-        }
-
-function checkTables() {
-            fetch('/get_active_tables?t=' + new Date().getTime())
-                .then(r => r.json())
-                .then(activeTables => {
-                    fetch(window.location.href)
-                        .then(res => res.text())
-                        .then(html => {
-                            let parser = new DOMParser();
-                            let doc = parser.parseFromString(html, 'text/html');
-                            let newGrid = doc.getElementById('tablesGridMobile');
-                            
-                            if (newGrid) {
-                                for(let i = 1; i <= 90; i++) {
-                                    const el = newGrid.querySelector('#m-tbl-' + i);
-                                    if(el) {
-                                        if(activeTables.includes(i.toString())) {
-                                            el.classList.add('active-occupied');
-                                        } else {
-                                            el.classList.remove('active-occupied');
-                                        }
-                                    }
-                                }
-                                document.getElementById('tablesGridMobile').innerHTML = newGrid.innerHTML;
-                            }
-                        }).catch(()=>{});
-                }).catch(()=>{});
-        }
-        
-        checkTables();
-        setInterval(checkTables, 3000);
-    </script>
-</body>
-</html>
-"""
-CUSTOMER_MENU_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="ckb" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>مێنیوی دیوانی سوڵتان - {{ table_num }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; }
-        body { background-color: #03261d; color: #ffffff; padding-bottom: {{ '115px' if allow_ordering else '30px' }}; min-height: 100vh; }
-        .top-header-bar { background-color: #03261d; padding: 10px 14px 6px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-        .header-brand { display: flex; align-items: center; gap: 6px; font-size: 17px; font-weight: 800; color: #ffffff; }
-        .table-pill { background-color: #059669; color: #ffffff; font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 20px; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        .categories-carousel { display: flex; overflow-x: auto; gap: 10px; padding: 10px 12px 14px; }
-        .cat-card-item { background: #064032; border-radius: 12px; padding: 5px; display: flex; flex-direction: column; align-items: center; width: 76px; flex-shrink: 0; cursor: pointer; }
-        .cat-card-item.active { border: 2px solid #ef4444; background: #085341; }
-        .cat-img-box { width: 62px; height: 62px; border-radius: 10px; overflow: hidden; margin-bottom: 5px; }
-        .cat-img-box img { width: 100%; height: 100%; object-fit: cover; }
-        .cat-title-text { font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
-
-        .foods-container { padding: 0 12px; }
-        .food-grid-2col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .food-card-white { background: #ffffff; border-radius: 14px; padding: 8px; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.25); }
-        .food-img-hero { width: 100%; height: 120px; border-radius: 10px; object-fit: cover; margin-bottom: 8px; }
-        .food-title-main { font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
-        .food-price-red { font-size: 14px; font-weight: 800; color: #e11d48; margin-bottom: 6px; }
-
-        .options-group { width: 100%; display: flex; flex-direction: row; gap: 4px; margin-bottom: 6px; }
-        .select-sub-opt { flex: 1; min-width: 0; padding: 5px 3px; border-radius: 6px; border: 1.5px solid #059669; background: #f8fafc; font-size: 11px; font-weight: 700; color: #03261d; outline: none; }
-
-        .mini-stepper { display: flex; align-items: center; background: #f1f5f9; border-radius: 8px; padding: 2px; gap: 4px; width: 100%; justify-content: space-between; }
-        .btn-step { width: 32px; height: 32px; border-radius: 6px; border: none; background: #e2e8f0; color: #0f172a; font-size: 16px; font-weight: 800; cursor: pointer; }
-        .btn-step.add { background: #10b981; color: #ffffff; }
-        .qty-val-display { font-size: 14px; font-weight: 800; color: #0f172a; }
-
-        .bottom-checkout-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(3, 38, 29, 0.95); border-top: 1px solid #0b5e4a; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 200; }
-        .cart-bubble-btn { display: flex; align-items: center; gap: 8px; background: #064032; padding: 8px 14px; border-radius: 10px; cursor: pointer; }
-        .cart-counter-pill { background: #10b981; color: #03261d; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 12px; }
-        .cart-sum-txt { color: #ffffff; font-weight: 800; font-size: 13.5px; }
-        .btn-submit-order { background: #10b981; color: #ffffff; border: none; padding: 10px 20px; border-radius: 10px; font-size: 13.5px; font-weight: 800; cursor: pointer; }
-
-        .modal-shade { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); z-index: 300; display: none; align-items: flex-end; }
-        .modal-bottom-box { background: #064032; width: 100%; max-height: 80vh; border-radius: 20px 20px 0 0; padding: 18px 16px; display: flex; flex-direction: column; border-top: 2px solid #10b981; }
-        .modal-items-scroller { overflow-y: auto; flex: 1; margin: 12px 0; }
-        .cart-row-item { background: #03261d; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        #toastBox { position: fixed; top: 65px; left: 50%; transform: translateX(-50%); background: #10b981; color: #ffffff; padding: 9px 20px; border-radius: 30px; font-size: 13px; font-weight: 700; z-index: 1000; display: none; }
-    </style>
-</head>
-<body>
-    <div id="toastBox">✅ داواکارییەکەت بۆ مەتبەخ نێردرا</div>
-
-    <header class="top-header-bar">
-        <div class="header-brand"><span>✨ دیوانی سوڵتان ڕێستۆرانت</span></div>
-        <div class="table-pill">{{ table_num }}</div>
-    </header>
-
+    <div id="toast">✅ نێردرا</div>
+    <div class="hdr">
+        <span style="font-weight:bold; color:var(--primary);">چێشتماڵە</span>
+        <span class="pill">{{ table_num }}</span>
+    </div>
     {% if not allow_ordering %}
-    <div style="background:#064032; color:#a7f3d0; font-size:11px; text-align:center; padding:6px; border-bottom:1px solid #0b5e4a;">
-        ℹ️ تەنها بینینی مێنیوە. بۆ داواکردن پەیوەندی بە کارمەند بکەن.
-    </div>
+    <div style="text-align:center; padding:5px; background:var(--danger); font-size:11px; font-weight:bold;">تەنها بۆ بینینە</div>
     {% endif %}
-
-    <div class="categories-carousel">
-        <div class="cat-card-item active" onclick="filterMenu('all', this)">
-            <div class="cat-img-box"><img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=150"></div>
-            <div class="cat-title-text">هەموو</div>
+    
+    <div class="cats">
+        <div class="c-btn act" onclick="fCat('all', this)">
+            <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=100" class="cat-visual-img">
+            <span data-tr="all">هەموو</span>
         </div>
         {% for cat, items in categories.items() %}
-        <div class="cat-card-item" onclick="filterMenu('group-{{ loop.index }}', this)">
-            <div class="cat-img-box"><img src="{{ items[0].image_path if items[0].image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150' }}" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150'"></div>
-            <div class="cat-title-text">{{ cat }}</div>
+        <div class="c-btn" onclick="fCat('c-{{ loop.index }}', this)">
+            <img src="{{ items[0].image_path if items[0].image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100' }}" class="cat-visual-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100'">
+            <span>{{ cat }}</span>
         </div>
         {% endfor %}
     </div>
 
-    <div class="foods-container">
+    <div class="f-grid" id="fGrid">
         {% for cat, items in categories.items() %}
-        <div class="category-block-wrapper" id="group-{{ loop.index }}" style="margin-bottom: 16px;">
-            <div class="food-grid-2col">
-                {% for item in items %}
-                <div class="food-card-white">
-                    <img src="{{ item.image_path if item.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="food-img-hero" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'">
-                    <div class="food-title-main">{{ item.food_name }}</div>
-                    <div class="food-price-red">{{ "{:,.0f}".format(item.price) }} د.ع</div>
-
-                    {% if allow_ordering %}
-                    {% set cat_str = item.category or '' %}
-                    {% set c_name = cat_str | replace('ي', 'ی') | trim %}
-
-                    {% set show_rice = ('کوڵاو' in c_name or 'پەلەوەر' in c_name or 'کورد' in c_name) %}
-                    {% set show_chicken = ('پەلەوەر' in c_name or 'مریشک' in c_name) %}
-
-                    {% if show_rice or show_chicken %}
-                    <div class="options-group">
-                        {% if show_rice %}
-                        <select class="select-sub-opt" id="opt_rice_{{ item.id }}">
-                            <option value="">ج. برنج</option>
-                            <option value="برنجی درێژ">برنجی درێژ</option>
-                            <option value="برنجی خڕ">برنجی خڕ</option>
-                            <option value="برنجی کوردی">برنجی کوردی</option>
-                            <option value="برنج بە سرکە">برنج بە سرکە</option>
-                        </select>
-                        {% endif %}
-                        {% if show_chicken %}
-                        <select class="select-sub-opt" id="opt_chicken_{{ item.id }}">
-                            <option value="">ب. مریشک</option>
-                            <option value="سینگ">سینگ</option>
-                            <option value="ڕان">ڕان</option>
-                        </select>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-
-                    <div class="mini-stepper">
-                        <button type="button" class="btn-step" onclick="changeCustomerQty('{{ item.food_name | replace("'", "\\'") }}', -1, {{ item.price }}, '{{ (item.category or '') | replace("'", "\\'") }}', {{ item.id }})">-</button>
-                        <span class="qty-val-display" data-name="{{ item.food_name }}" id="count_{{ item.id }}">0</span>
-                        <button type="button" class="btn-step add" onclick="changeCustomerQty('{{ item.food_name | replace("'", "\\'") }}', 1, {{ item.price }}, '{{ (item.category or '') | replace("'", "\\'") }}', {{ item.id }})">+</button>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
+        {% set cat_idx = loop.index %}
+        {% for it in items %}
+        <div class="f-card cat-it c-{{ cat_idx }}">
+            <img src="{{ it.image_path if it.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="f-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'">
+            <div class="f-name food-title-disp" data-ku="{{ it.food_name }}" data-ar="{{ it.food_name_ar or it.food_name }}" data-en="{{ it.food_name_en or it.food_name }}">{{ it.food_name }}</div>
+            <div class="f-price">{{ "{:,.0f}".format(it.price) }}</div>
+            {% if allow_ordering %}
+            {% set c_name = (it.category or '') | replace('ي', 'ی') | trim %}
+            {% set show_fish = ('ماسی' in c_name or 'ماسی' in it.food_name) %}
+            {% set show_r = ('کوڵاو' in c_name or 'پەلەوەر' in c_name or 'کورد' in c_name) %}
+            {% set show_c = ('پەلەوەر' in c_name or 'مریشک' in c_name) %}
+            
+            {% if show_r or show_c or show_fish %}
+                {% if show_fish %}
+                <input type="number" id="w_{{it.id}}" class="opt-select" step="0.25" min="0.25" value="1" onclick="event.stopPropagation()" placeholder="کێش">
+                {% endif %}
+                {% if show_r %}<select class="opt-select" id="rm_{{it.id}}"><option value="">ج. برنج</option><option value="درێژ">درێژ</option><option value="خڕ">خڕ</option><option value="کوردی">کوردی</option></select>{% endif %}
+                {% if show_c %}<select class="opt-select" id="cm_{{it.id}}"><option value="">ب. مریشک</option><option value="سینگ">سینگ</option><option value="ڕان">ڕان</option></select>{% endif %}
+            {% endif %}
+            <div class="stp">
+                <button class="s-btn" onclick="addF('{{ it.food_name | replace("'", "\\'") }}',-1,{{it.price}},'{{it.category}}',{{it.id}})">-</button>
+                <span style="font-weight:bold; font-size:14px;" data-name="{{it.food_name}}" class="qty-lbl">0</span>
+                <button class="s-btn add" onclick="addF('{{ it.food_name | replace("'", "\\'") }}',1,{{it.price}},'{{it.category}}',{{it.id}})">+</button>
             </div>
+            {% endif %}
         </div>
+        {% endfor %}
         {% endfor %}
     </div>
 
     {% if allow_ordering %}
-    <div class="bottom-checkout-bar">
-        <div class="cart-bubble-btn" onclick="openCartView()">
-            <span style="font-size: 18px;">🛒</span>
-            <span class="cart-counter-pill" id="cartBadgeCount">0</span>
-            <span class="cart-sum-txt" id="cartTotalDisplay">0 د.ع</span>
+    <div class="btm-bar">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:20px;">🛒</span>
+            <span style="background:var(--primary); color:#000; padding:2px 8px; border-radius:10px; font-weight:bold; font-size:12px;" id="cBadge">0</span>
+            <span style="font-weight:bold;" id="cTot">0 د.ع</span>
         </div>
-        <button type="button" class="btn-submit-order" onclick="sendFinalOrder()">سەیرکردنی سەبەتە ➔</button>
+        <button style="background:var(--accent); color:#000; border:none; padding:10px 20px; border-radius:10px; font-weight:bold;" onclick="document.getElementById('mCart').style.display='flex'" data-tr="cart">سەبەتە ➔</button>
     </div>
 
-    <div class="modal-shade" id="cartModalShade" onclick="closeCartView(event)">
-        <div class="modal-bottom-box" onclick="event.stopPropagation()">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #0b5e4a; padding-bottom: 8px;">
-                <span style="font-size: 15px; font-weight: 800; color: #ffffff;">🛒 داواکارییەکانی: {{ table_num }}</span>
-                <button type="button" style="background:none; border:none; color:#ef4444; font-size:18px; font-weight:800;" onclick="toggleCartModal(false)">✕</button>
+    <div class="modal" id="mCart" onclick="if(event.target.id==='mCart') this.style.display='none'">
+        <div class="m-box" onclick="event.stopPropagation()">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                <span style="font-weight:bold; color:var(--primary);" data-tr="cart">🛒 سەبەتە</span>
+                <span style="color:var(--danger); cursor:pointer; font-weight:bold;" onclick="document.getElementById('mCart').style.display='none'">✕</span>
             </div>
-            <div class="modal-items-scroller" id="cartScrollerList"></div>
-            
-            <div style="display:flex; gap:8px;">
-                <button type="button" id="btnMobileAddDivider" class="btn-submit-order" style="background:#8b5cf6; display:none; flex:1;" onclick="addNewPlateDividerMobile()">➕ هێڵی جیاکەرەوە</button>
-                <button type="button" class="btn-submit-order" style="flex:2;" onclick="sendFinalOrderToKitchen()">پشتڕاستکردنەوە و ناردن</button>
+            <div class="m-list" id="mList"></div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-send" style="background:#8b5cf6; flex:1; display:none; color:#fff;" id="btnDivM" onclick="addDivM()">+ هێڵ</button>
+                <button class="btn-send" style="flex:2;" onclick="sendOrder()" data-tr="send">ناردن بۆ مەتبەخ</button>
             </div>
         </div>
     </div>
     {% endif %}
 
     <script>
-        let myCart = [];
-        let originalTableOrders = [];
-        const tableId = {{ table_num|tojson }};
-        const isWaiter = window.location.href.includes('/mobile/menu');
+        let cart=[], orig=[]; const tbl="{{ table_num }}"; const isW=location.href.includes('/mobile/menu');
 
-        function showNotification(text, isError = false) {
-            const toast = document.getElementById('toastBox');
-            toast.innerText = text;
-            toast.style.background = isError ? '#ef4444' : '#10b981';
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        let tempWL = localStorage.getItem('lang') || 'ku';
+        function selWLang(l, btn) {
+            tempWL = l;
+            document.querySelectorAll('.wl-lang-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+        function closeWelcome() {
+            setLang(tempWL);
+            document.getElementById('welcomeOverlay').style.display = 'none';
         }
 
-        function checkHasGrillMobile() {
-            let hasGrill = myCart.some(i => !i.is_divider && (i.cat === 'برژاو' || i.food_name.includes('کەباب') || i.food_name.includes('تکە')));
-            let btn = document.getElementById('btnMobileAddDivider');
-            if (btn) btn.style.display = hasGrill ? 'block' : 'none';
-        }
-
-        function addNewPlateDividerMobile() {
-            if (myCart.length === 0 || (myCart[myCart.length - 1] && myCart[myCart.length - 1].is_divider)) return;
-            myCart.push({ is_divider: true, food_name: '─── قاپی نوێ ───', full_name: '─── قاپی نوێ ───', price: 0, qty: 1, cat: 'برژاو', safe_id: 'div' });
-            renderCartUI();
-            checkHasGrillMobile();
-        }
-
-        function filterMenu(groupId, el) {
-            document.querySelectorAll('.cat-card-item').forEach(c => c.classList.remove('active'));
-            el.classList.add('active');
-            document.querySelectorAll('.category-block-wrapper').forEach(g => {
-                g.style.display = (groupId === 'all' || g.id === groupId) ? 'block' : 'none';
-            });
-        }
-
-        function fetchTableOrders() {
-            fetch('/get_table_orders/' + encodeURIComponent(tableId))
-            .then(r => r.json())
-            .then(data => {
-                myCart = [];
-                originalTableOrders = [];
-                if (data && data.length > 0) {
-                    data.forEach((item, index) => {
-                        let isDiv = item.food_name.includes('قاپی نوێ') || item.food_name.includes('───');
-                        let it = {
-                            is_divider: isDiv,
-                            base_name: item.food_name.split(' (')[0],
-                            full_name: item.food_name,
-                            food_name: item.food_name,
-                            qty: parseInt(item.quantity),
-                            price: parseFloat(item.price),
-                            cat: item.category || '',
-                            safe_id: index
-                        };
-                        myCart.push(it);
-                        originalTableOrders.push(JSON.parse(JSON.stringify(it)));
-                    });
-                }
-                refreshCounterDisplays();
-                checkHasGrillMobile();
-                renderCartUI();
-            });
-        }
-
-        window.onload = function() {
-            fetchTableOrders();
-        };
-
-        function getOrigQty(fullName) {
-            let orig = originalTableOrders.find(o => o.full_name === fullName && !o.is_divider);
-            return orig ? orig.qty : 0;
-        }
-
-        function changeCustomerQty(baseName, delta, price, cat, foodId) {
-            let riceVal = '', chickenVal = '';
-            const rEl = document.getElementById('opt_rice_' + foodId);
-            const cEl = document.getElementById('opt_chicken_' + foodId);
-
-            if (rEl && rEl.value) riceVal = rEl.value.trim();
-            if (cEl && cEl.value) chickenVal = cEl.value.trim();
-
-            let finalName = baseName;
-            let parts = [];
-            if (riceVal) parts.push(riceVal);
-            if (chickenVal) parts.push(chickenVal);
-
-            if (parts.length > 0) {
-                finalName += ` (${parts.join(' - ')})`;
+        document.addEventListener("DOMContentLoaded", () => {
+            if(isW) { document.getElementById('welcomeOverlay').style.display = 'none'; }
+            else {
+                let el = document.querySelector(`.wl-lang-btn[onclick*="'${tempWL}'"]`);
+                if(el) selWLang(tempWL, el);
             }
+        });
 
-            let origQty = getOrigQty(finalName);
-            let found = false;
+        window.addEventListener('langChanged', () => {
+            let l = window.savedLang;
+            document.querySelectorAll('.food-title-disp').forEach(el => {
+                el.innerText = el.getAttribute('data-' + l) || el.getAttribute('data-ku');
+            });
+            ren();
+        });
+
+        function fCat(id, btn) {
+            document.querySelectorAll('.c-btn').forEach(b=>b.classList.remove('act')); btn.classList.add('act');
+            document.querySelectorAll('.cat-it').forEach(i => i.style.display = (id==='all' || i.classList.contains(id)) ? 'block' : 'none');
+        }
+
+        function addF(n, d, p, c, id) {
+            let fn = n, rel = document.getElementById('rm_'+id), cel = document.getElementById('cm_'+id);
+            if(rel && rel.value) fn += ` (${rel.value})`;
+            if(cel && cel.value) fn += ` (${cel.value})`;
             
-            for (let i = myCart.length - 1; i >= 0; i--) {
-                if (myCart[i].is_divider) break; // تەنها لە هەمان قاپ دەگەڕێت و تێکەڵی ناکات
-                if (myCart[i].full_name === finalName) {
-                    let newQty = myCart[i].qty + delta;
-                    if (!isWaiter && newQty < origQty) {
-                        showNotification("ناتوانیت داواکاری پێشوو کەم بکەیتەوە!", true);
-                        return;
-                    }
-                    myCart[i].qty = newQty;
-                    if (myCart[i].qty <= 0) myCart.splice(i, 1);
-                    found = true;
-                    break;
+            let qtyToAdd = d;
+            let wEl = document.getElementById('w_'+id);
+            if(wEl && wEl.value) {
+                let w = parseFloat(wEl.value);
+                if(!isNaN(w) && w > 0) {
+                    qtyToAdd = d > 0 ? w : -w;
                 }
             }
-            
-            if (!found && delta > 0) {
-                myCart.push({
-                    is_divider: false,
-                    base_name: baseName,
-                    full_name: finalName,
-                    food_name: finalName,
-                    price: price,
-                    qty: 1,
-                    cat: cat || '',
-                    safe_id: foodId
-                });
+
+            let oQ = orig.find(o=>o.ku===fn && !o.is_divider); oQ = oQ?oQ.qty:0;
+            let f = false;
+            for(let i=cart.length-1; i>=0; i--) {
+                if(cart[i].is_divider) break;
+                if(cart[i].ku === fn) {
+                    let nQ = cart[i].qty + qtyToAdd;
+                    if(!isW && nQ < oQ) return alert("ناتوانیت داواکاری پێشوو کەم بکەیتەوە!");
+                    cart[i].qty = nQ;
+                    if(cart[i].qty<=0) cart.splice(i,1);
+                    f=true; break;
+                }
             }
-            refreshCounterDisplays();
-            checkHasGrillMobile();
-            renderCartUI();
+            if(!f && d>0) {
+                cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:qtyToAdd, cat:c});
+            }
+            ren();
         }
 
-        function refreshCounterDisplays() {
-            document.querySelectorAll('.qty-val-display').forEach(el => {
-                let itemName = el.getAttribute('data-name');
-                let totalQty = 0;
-                myCart.forEach(cartItem => {
-                    if (!cartItem.is_divider && (cartItem.base_name === itemName || cartItem.full_name === itemName)) {
-                        totalQty += cartItem.qty;
-                    }
-                });
-                el.innerText = totalQty;
-            });
+        function updQ(i, d) {
+            let oQ = orig.find(o=>o.ku===cart[i].ku && !o.is_divider); oQ = oQ?oQ.qty:0;
+            let nQ = cart[i].qty + d;
+            if(!isW && nQ < oQ) return alert("ناتوانیت داواکاری پێشوو کەم بکەیتەوە!");
+            cart[i].qty = nQ;
+            if(cart[i].qty<=0) cart.splice(i,1);
+            ren();
         }
 
-        function renderCartUI() {
-            let total = 0, count = 0, plateNum = 1;
-            const scroller = document.getElementById('cartScrollerList');
-            if (scroller) scroller.innerHTML = '';
+        function delI(i) { cart.splice(i, 1); ren(); }
+        
+        function edtM(i) { 
+            let n=prompt('تێبینی (بۆ نموونە: بێ پیاز):'); 
+            if(n && n.trim() !== '') {
+                cart[i].ku += ` (${n.trim()})`;
+                cart[i].full_name = cart[i].ku; 
+                ren();
+            } 
+        }
 
-            myCart.forEach((item, index) => {
-                if (item.is_divider || item.food_name.includes('قاپی نوێ')) {
-                    plateNum++;
-                    if (scroller) {
-                        scroller.innerHTML += `<div style="background:#8b5cf6; padding:6px 10px; border-radius:8px; font-size:12px; font-weight:800; display:flex; justify-content:space-between; margin-bottom:8px;"><span>🍽 هێڵی جیاکەرەوە (قاپی ${plateNum})</span><button onclick="myCart.splice(${index},1); renderCartUI(); checkHasGrillMobile();" style="background:#ef4444; border:none; color:#fff; border-radius:4px; padding:2px 6px;">✕</button></div>`;
-                    }
+        function addDivM() { 
+            if(cart.length===0 || (cart[cart.length-1] && cart[cart.length-1].is_divider)) return; 
+            cart.push({is_divider:true, ku:'─── قاپی نوێ ───', full_name:'───', price:0, qty:1, cat:''}); 
+            ren(); 
+        }
+
+        function ren() {
+            let cnt=0, h='', pN=1, hG=false, tot=0;
+            let l = window.savedLang;
+            cart.forEach((it, i) => {
+                if(it.is_divider) {
+                    pN++; h += `<div style="background:#8b5cf6; color:#fff; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:5px;"><span>🍽 قاپی ${pN}</span><span onclick="delI(${i})" style="cursor:pointer; background:#ef4444; padding:2px 8px; border-radius:4px;">✕</span></div>`;
                 } else {
-                    total += item.qty * item.price;
-                    count += item.qty;
-                    if (scroller) {
-                        scroller.innerHTML += `
-                            <div class="cart-row-item">
-                                <div style="text-align: right;">
-                                    <div style="font-weight:700; font-size:13.5px; color:#fff;">${item.full_name}</div>
-                                    <div style="color:#10b981; font-size:12px; font-weight:700;">${(item.qty * item.price).toLocaleString()} د.ع</div>
-                                </div>
-                                <div style="display:flex; align-items:center; gap:6px;">
-                                    <button type="button" style="background:#ef4444; color:#fff; border:none; width:26px; height:26px; border-radius:4px; font-weight:800; cursor:pointer;" onclick="modifyCustomerCart(${index}, -1)">-</button>
-                                    <span style="background:#064032; border:1px solid #10b981; padding:3px 10px; border-radius:6px; font-weight:800;">${item.qty}</span>
-                                    <button type="button" style="background:#10b981; color:#fff; border:none; width:26px; height:26px; border-radius:4px; font-weight:800; cursor:pointer;" onclick="modifyCustomerCart(${index}, 1)">+</button>
-                                </div>
-                            </div>`;
-                    }
+                    if(it.cat==='برژاو' || it.ku.includes('کەباب')) hG=true;
+                    cnt += it.qty; tot += it.price*it.qty;
+                    let dName = it[l] || it.ku;
+                    h += `<div class="c-row">
+                        <div style="flex:1; text-align:right; font-size:14px; font-weight:bold;">${dName}</div>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="color:var(--accent); font-size:12px; font-weight:bold;">${(it.price*it.qty).toLocaleString()}</span>
+                            <button class="s-btn" style="background:#ef4444; font-size:12px;" onclick="delI(${i})">🗑</button>
+                            <button class="s-btn" style="background:#3b82f6; font-size:12px;" onclick="edtM(${i})">✏️</button>
+                            <button class="s-btn" onclick="updQ(${i},-1)">-</button>
+                            <span style="width:30px; text-align:center; font-weight:bold; background:rgba(255,255,255,0.1); border-radius:4px; padding:2px;">${parseFloat(it.qty.toFixed(3))}</span>
+                            <button class="s-btn add" onclick="updQ(${i},1)">+</button>
+                        </div>
+                    </div>`;
                 }
             });
-            if (document.getElementById('cartBadgeCount')) {
-                document.getElementById('cartBadgeCount').innerText = count;
-                document.getElementById('cartTotalDisplay').innerText = total.toLocaleString() + ' د.ع';
-            }
-        }
-
-        function modifyCustomerCart(index, delta) {
-            if (myCart[index]) {
-                let origQty = getOrigQty(myCart[index].full_name);
-                let newQty = myCart[index].qty + delta;
-                if (!isWaiter && newQty < origQty) {
-                    showNotification("ناتوانیت داواکاری پێشوو کەم بکەیتەوە!", true);
-                    return;
-                }
-                myCart[index].qty = newQty;
-                if (myCart[index].qty <= 0) myCart.splice(index, 1);
-                refreshCounterDisplays();
-                checkHasGrillMobile();
-                renderCartUI();
-            }
-        }
-
-        function openCartView() { toggleCartModal(true); }
-        function toggleCartModal(show) { 
-            const m = document.getElementById('cartModalShade'); 
-            if (m) m.style.display = show ? 'flex' : 'none'; 
-        }
-        function closeCartView(e) { if (e.target.id === 'cartModalShade') toggleCartModal(false); }
-
-        function sendFinalOrder() {
-            toggleCartModal(true);
-        }
-
-        function sendFinalOrderToKitchen() {
-            if (myCart.length === 0) { showNotification("سەرەتا خواردن هەڵبژێرە!", true); return; }
-            
-            let formattedCart = myCart.map(it => ({
-                is_divider: it.is_divider,
-                food_name: it.full_name || it.food_name,
-                qty: it.qty,
-                price: it.price,
-                cat: it.cat || 'گشتی'
-            }));
-
-            fetch('/save_cart_order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    table_number: tableId, 
-                    cart_items: formattedCart, 
-                    original_items: originalTableOrders 
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    showNotification("✅ داواکارییەکەت بۆ مەتبەخ نێردرا");
-                    if (isWaiter) {
-                        setTimeout(() => { window.location.href = '/mobile/tables'; }, 800);
-                    } else {
-                        toggleCartModal(false);
-                        fetchTableOrders(); 
-                    }
-                } else showNotification(data.message || 'هەڵە لە ناردن', true);
+            let ls=document.getElementById('mList'); if(ls) ls.innerHTML=h;
+            let cb=document.getElementById('cBadge'); if(cb) { cb.innerText=parseFloat(cnt.toFixed(3)); document.getElementById('cTot').innerText = tot.toLocaleString() + ' د.ع'; }
+            let dV=document.getElementById('btnDivM'); if(dV) dV.style.display=hG?'block':'none';
+            document.querySelectorAll('.qty-lbl').forEach(el => {
+                let n=el.getAttribute('data-name'), tq=0;
+                cart.forEach(c => { if(!c.is_divider && c.ku.includes(n)) tq+=c.qty; });
+                el.innerText=parseFloat(tq.toFixed(3));
             });
         }
+
+        function toast(m, e=false) {
+            let t = document.getElementById('toast'); t.innerText=m; t.style.background=e?'var(--danger)':'var(--accent)'; t.style.display='block';
+            setTimeout(()=>t.style.display='none', 2000);
+        }
+
+        function sendOrder() {
+            if(cart.length===0) return toast('سەبەتە بەتاڵە', true);
+            let fCart = cart.map(it => ({ is_divider: it.is_divider, food_name: it.ku, qty: it.qty, price: it.price, cat: it.cat || 'گشتی' }));
+            fetch('/save_cart_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:tbl, cart_items:fCart, original_items:orig}) })
+            .then(r=>r.json()).then(d=>{
+                if(d.status==='success') { document.getElementById('mCart').style.display='none'; if(isW) location.href='/mobile/tables'; else fetchTable(); }
+            });
+        }
+
+        function fetchTable() {
+            fetch('/get_table_orders/'+encodeURIComponent(tbl)).then(r=>r.json()).then(d=>{
+                cart=[]; orig=[];
+                if(d) { d.forEach(it=>{ 
+                    let o={is_divider:it.food_name.includes('───'), ku:it.food_name, full_name:it.food_name, price:parseFloat(it.price), qty:parseFloat(it.quantity), cat:it.category}; 
+                    cart.push(o); orig.push(JSON.parse(JSON.stringify(o))); 
+                }); } ren();
+            });
+        }
+        window.onload = fetchTable;
     </script>
 </body>
 </html>
 """
+
 # ==========================================
-# ڕێڕەوەکانی سەرەکی و چوونەژوورەوە
+# 6. ڕێڕەوەکان (Routes)
 # ==========================================
 
 @app.route('/')
@@ -2881,17 +1577,14 @@ def login():
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (uname, pwd))
                 user_row = cur.fetchone()
-        except Exception as ex:
-            print("Login error:", ex)
+        except: pass
         finally:
             if conn:
                 try: conn.close()
                 except: pass
 
         if user_row:
-            if not user_row.get('is_active', 1):
-                return render_template_string(LOGIN_TEMPLATE, error='ئەم بەکارهێنەرە بلۆککراوە!')
-
+            if not user_row.get('is_active', 1): return render_template_string(LOGIN_TEMPLATE, error='بلۆککراوە!')
             session.clear()
             session.permanent = True
             session['authenticated'] = True
@@ -2899,1193 +1592,485 @@ def login():
             session['username'] = user_row['username']
             session['full_name'] = user_row.get('full_name', '')
             role = user_row.get('role', 'Waiter')
-
-            if role in ['Manager', 'Admin', 'admin']:
-                session['role'] = 'admin'
-                return redirect(url_for('admin_dashboard'))
-            elif role == 'Mobile_Waiter':
-                session['role'] = 'mobile_waiter'
-                return redirect(url_for('mobile_waiter_tables'))
-            elif role == 'Cashier':
-                session['role'] = 'admin'
-                return redirect(url_for('admin_cashier'))
-            else:
-                session['role'] = 'waiter'
-                return redirect(url_for('desktop_tables'))
+            if role in ['Manager', 'Admin', 'admin']: session['role'] = 'admin'; return redirect(url_for('admin_dashboard'))
+            elif role == 'Mobile_Waiter': session['role'] = 'mobile_waiter'; return redirect(url_for('mobile_waiter_tables'))
+            elif role == 'Cashier': session['role'] = 'admin'; return redirect(url_for('admin_cashier'))
+            else: session['role'] = 'waiter'; return redirect(url_for('desktop_tables'))
 
         if pwd in ['99', '٩٩', '222', '٢٢٢']:
-            session.clear()
-            session.permanent = True
-            session['authenticated'] = True
-            session['role'] = 'admin'
-            session['full_name'] = 'بەڕێوەبەر'
-            return redirect(url_for('admin_dashboard'))
+            session.clear(); session.permanent = True; session['authenticated'] = True; session['role'] = 'admin'; session['full_name'] = 'بەڕێوەبەر'; return redirect(url_for('admin_dashboard'))
         elif pwd in ['345678', '٣٤٥٦٧٨']:
-            session.clear()
-            session.permanent = True
-            session['authenticated'] = True
-            session['role'] = 'mobile_waiter'
-            session['full_name'] = 'گارسۆنی مۆبایل'
-            return redirect(url_for('mobile_waiter_tables'))
+            session.clear(); session.permanent = True; session['authenticated'] = True; session['role'] = 'mobile_waiter'; return redirect(url_for('mobile_waiter_tables'))
         elif pwd in ['22', '٢٢']:
-            session.clear()
-            session.permanent = True
-            session['authenticated'] = True
-            session['role'] = 'waiter'
-            session['full_name'] = 'گارسۆنی ئایپاد'
-            return redirect(url_for('desktop_tables'))
-
-        error = 'ناوی بەکارهێنەر یان وشەی نهێنی هەڵەیە!'
-
+            session.clear(); session.permanent = True; session['authenticated'] = True; session['role'] = 'waiter'; return redirect(url_for('desktop_tables'))
+        error = 'زانیارییەکان هەڵەیە!'
     return render_template_string(LOGIN_TEMPLATE, error=error)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
-def fix_kurdish_text(text):
-    if not text: return ""
-    reshaped_text = arabic_reshaper.reshape(str(text))
-    return get_display(reshaped_text)
 
-def get_text_width(draw, text, font):
-    try:
-        return draw.textlength(text, font=font)
-    except AttributeError:
-        try:
-            return draw.textsize(text, font=font)[0]
-        except:
-            bbox = draw.textbbox((0,0), text, font=font)
-            return bbox[2] - bbox[0]
-
-def print_cashier_receipt(table_num, items, total, paid, discount):
-    try:
-        # دۆزینەوەی ئەو پرێنتەرەی نیشانەی سەوزی لەسەرە بە شێوەیەکی ئۆتۆماتیکی
-        printer_name = win32print.GetDefaultPrinter()
-        
-        width = 576
-        estimated_height = 600 + (len(items) * 60)
-        img = Image.new('RGB', (width, estimated_height), color='white')
-        draw = ImageDraw.Draw(img)
-        
-        try:
-            font_title = ImageFont.truetype("tahoma.ttf", 40)
-            font_item = ImageFont.truetype("tahoma.ttf", 28)
-            font_sub = ImageFont.truetype("tahoma.ttf", 24)
-        except:
-            font_title = ImageFont.load_default()
-            font_item = font_title
-            font_sub = font_title
-
-        y = 20
-        t1 = fix_kurdish_text("دیوانی سوڵتان ڕێستۆرانت")
-        draw.text(((width - get_text_width(draw, t1, font_title)) / 2, y), t1, font=font_title, fill='black')
-        y += 60
-
-        t2 = fix_kurdish_text("وەسڵی فرۆشتن و قاسە")
-        draw.text(((width - get_text_width(draw, t2, font_item)) / 2, y), t2, font=font_item, fill='black')
-        y += 50
-
-        t3 = fix_kurdish_text(f"مێزی: {table_num}")
-        draw.text(((width - get_text_width(draw, t3, font_item)) / 2, y), t3, font=font_item, fill='black')
-        y += 50
-        
-        dt_txt = time.strftime("%Y/%m/%d   %I:%M %p")
-        draw.text(((width - get_text_width(draw, dt_txt, font_sub)) / 2, y), dt_txt, font=font_sub, fill='black')
-        y += 40
-
-        line = "-" * 45
-        draw.text((20, y), line, font=font_sub, fill='black')
-        y += 40
-
-        draw.text((width - 20 - get_text_width(draw, fix_kurdish_text("خواردن"), font_item), y), fix_kurdish_text("خواردن"), font=font_item, fill='black')
-        draw.text((220, y), fix_kurdish_text("بڕ"), font=font_item, fill='black')
-        draw.text((20, y), fix_kurdish_text("کۆی گشتی"), font=font_item, fill='black')
-        y += 50
-
-        draw.text((20, y), line, font=font_sub, fill='black')
-        y += 40
-
-        for it in items:
-            fname = fix_kurdish_text(str(it['food_name']))
-            qty = fix_kurdish_text(str(it['quantity']))
-            line_tot = fix_kurdish_text(f"{int(float(it['price']) * int(it['quantity'])):,}")
-            
-            draw.text((width - 20 - get_text_width(draw, fname, font_sub), y), fname, font=font_sub, fill='black')
-            draw.text((220, y), qty, font=font_sub, fill='black')
-            draw.text((20, y), line_tot, font=font_sub, fill='black')
-            y += 45
-
-        draw.text((20, y), line, font=font_sub, fill='black')
-        y += 40
-
-        t_tot = fix_kurdish_text(f"کۆی گشتی: {int(total):,} دینار")
-        draw.text((width - 20 - get_text_width(draw, t_tot, font_item), y), t_tot, font=font_item, fill='black')
-        y += 50
-
-        t_paid = fix_kurdish_text(f"پارەی وەرگیراو: {int(paid):,} دینار")
-        draw.text((width - 20 - get_text_width(draw, t_paid, font_sub), y), t_paid, font=font_sub, fill='black')
-        y += 40
-
-        change = paid - total
-        t_change = fix_kurdish_text(f"گێڕاوە (باقی): {int(change) if change > 0 else 0:,} دینار")
-        draw.text((width - 20 - get_text_width(draw, t_change, font_sub), y), t_change, font=font_sub, fill='black')
-        y += 50
-
-        draw.text((20, y), line, font=font_sub, fill='black')
-        y += 40
-
-        msg = fix_kurdish_text("بەخێر بێنەوە! سوپاس بۆ سەردانکردنتان")
-        draw.text(((width - get_text_width(draw, msg, font_sub)) / 2, y), msg, font=font_sub, fill='black')
-        y += 60
-
-        img = img.crop((0, 0, width, y))
-        hDC = win32ui.CreateDC()
-        hDC.CreatePrinterDC(printer_name)
-        hDC.StartDoc(f"Receipt - {table_num}")
-        hDC.StartPage()
-
-        dib = ImageWin.Dib(img)
-        printable_width = hDC.GetDeviceCaps(8)
-        if printable_width <= 0: printable_width = 576
-        scaled_height = int(printable_width * (img.height / img.width))
-
-        dib.draw(hDC.GetHandleOutput(), (0, 0, printable_width, scaled_height))
-
-        hDC.EndPage()
-        hDC.EndDoc()
-        del hDC
-    except Exception as ex:
-        print(f"Receipt Print Error: {ex}")
-# ==========================================
-# ڕێڕەوەکانی ئەدمین
-# ==========================================
 @app.route('/admin')
 def admin_dashboard():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
-
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
     today_sales, today_expense, active_tables, total_workers = 0, 0, 0, 0
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             cur.execute("SELECT IFNULL(SUM(amount), 0) AS s FROM qasa WHERE transaction_time >= NOW() - INTERVAL 1 DAY")
             today_sales = float(cur.fetchone()['s'])
-            
             if today_sales == 0:
                 cur.execute("SELECT IFNULL(SUM(quantity * price), 0) AS s FROM froshtn WHERE created_at >= NOW() - INTERVAL 1 DAY AND food_name NOT LIKE '%قاپی نوێ%'")
                 today_sales = float(cur.fetchone()['s'])
-
             cur.execute("SELECT IFNULL(SUM(amount), 0) AS e FROM masrwf WHERE DATE(masrwf_date) = CURDATE()")
             today_expense = float(cur.fetchone()['e'])
             cur.execute("SELECT COUNT(DISTINCT table_cabin) AS c FROM froshtn WHERE table_cabin NOT LIKE '%[%' AND table_cabin != ''")
             active_tables = int(cur.fetchone()['c'])
             cur.execute("SELECT COUNT(*) AS w FROM workers")
             total_workers = int(cur.fetchone()['w'])
-    except Exception as ex:
-        print("Dashboard stats error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-
-    return render_template_string(
-        ADMIN_DASHBOARD_TEMPLATE,
-        today_sales=today_sales,
-        today_expense=today_expense,
-        active_tables_count=active_tables,
-        total_workers=total_workers
-    )
+    except: pass
+    finally: conn.close()
+    return render_template_string(ADMIN_DASHBOARD_TEMPLATE, today_sales=today_sales, today_expense=today_expense, active_tables_count=active_tables, total_workers=total_workers)
 
 @app.route('/admin/amar')
 def admin_amar():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
-
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
     today = datetime.now()
-    first_day_of_month = today.replace(day=1).strftime('%Y-%m-%d')
-    today_str = today.strftime('%Y-%m-%d')
-
-    start_date = request.args.get('start_date', first_day_of_month)
-    end_date = request.args.get('end_date', today_str)
-
-    report_rows = []
-    total_sales = 0.0
-    total_expenses = 0.0
-    total_workers_wage = 0.0
-    total_items_count = 0
-
-    conn = None
+    start_date = request.args.get('start_date', today.replace(day=1).strftime('%Y-%m-%d'))
+    end_date = request.args.get('end_date', today.strftime('%Y-%m-%d'))
+    report_rows, total_sales, total_expenses, total_workers_wage = [], 0.0, 0.0, 0.0
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            query_sales = """
-                SELECT food_name, quantity, price
-                FROM froshtn
-                WHERE DATE(created_at) >= %s AND DATE(created_at) <= %s
-                  AND food_name NOT LIKE '%%قاپی نوێ%%'
-                  AND food_name != ''
-                  AND food_name IS NOT NULL;
-            """
-            cur.execute(query_sales, (start_date, end_date))
+            cur.execute("SELECT food_name, quantity, price FROM froshtn WHERE DATE(created_at) >= %s AND DATE(created_at) <= %s AND food_name NOT LIKE '%%قاپی نوێ%%'", (start_date, end_date))
             raw_data = cur.fetchall()
-
             aggregated = {}
             for item in raw_data:
-                raw_name = str(item.get('food_name') or '').strip()
-                clean_name = re.sub(r'^[+\s]+|[+\s]+$', '', raw_name)
-                clean_name = clean_name.replace('+', '').strip()
-
-                qty = int(item.get('quantity') or 1)
-                price = float(item.get('price') or 0)
-
-                if clean_name not in aggregated:
-                    aggregated[clean_name] = {'food_name': clean_name, 'qty': 0, 'price': price, 'total': 0.0}
-                
+                clean_name = re.sub(r'^[+\s]+|[+\s]+$', '', str(item.get('food_name') or '')).replace('+', '').strip()
+                qty = float(item.get('quantity') or 1); price = float(item.get('price') or 0)
+                if clean_name not in aggregated: aggregated[clean_name] = {'food_name': clean_name, 'qty': 0, 'price': price, 'total': 0.0}
                 aggregated[clean_name]['qty'] += qty
                 aggregated[clean_name]['total'] += (qty * price)
-
             report_rows = sorted(list(aggregated.values()), key=lambda x: x['qty'], reverse=True)
             total_sales = sum(r['total'] for r in report_rows)
-            total_items_count = sum(r['qty'] for r in report_rows)
-
             try:
                 cur.execute("SELECT IFNULL(SUM(amount), 0) AS e FROM masrwf WHERE DATE(masrwf_date) >= %s AND DATE(masrwf_date) <= %s", (start_date, end_date))
-                exp_row = cur.fetchone()
-                total_expenses = float(exp_row['e']) if exp_row else 0.0
-            except:
-                total_expenses = 0.0
-
-            try:
-                query_workers = """
-                    SELECT IFNULL(SUM((CASE WHEN wa.status = 'هاتوو' THEN w.salary ELSE 0 END) + IFNULL(wa.bonus, 0)), 0) AS w_due
-                    FROM workers w
-                    INNER JOIN worker_attendance wa ON w.id = wa.worker_id
-                    WHERE wa.date >= %s AND wa.date <= %s;
-                """
-                cur.execute(query_workers, (start_date, end_date))
-                work_row = cur.fetchone()
-                total_workers_wage = float(work_row['w_due']) if work_row else 0.0
-            except:
-                total_workers_wage = 0.0
-
-    except Exception as ex:
-        print("LoadAmarData error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
+                total_expenses = float(cur.fetchone()['e'])
             except: pass
+            try:
+                cur.execute("SELECT IFNULL(SUM((CASE WHEN wa.status = 'هاتوو' THEN w.salary ELSE 0 END) + IFNULL(wa.bonus, 0)), 0) AS w_due FROM workers w INNER JOIN worker_attendance wa ON w.id = wa.worker_id WHERE wa.date >= %s AND wa.date <= %s", (start_date, end_date))
+                total_workers_wage = float(cur.fetchone()['w_due'])
+            except: pass
+    except: pass
+    finally: conn.close()
+    net_profit = total_sales - (total_expenses + total_workers_wage)
+    return render_template_string(WEB_AMAR_TEMPLATE, start_date=start_date, end_date=end_date, report_rows=report_rows, total_sales=total_sales, total_expenses=total_expenses, total_workers_wage=total_workers_wage, net_profit=net_profit)
 
-    total_all_expenses = total_expenses + total_workers_wage
-    net_profit = total_sales - total_all_expenses
+@app.route('/admin/masrwf')
+def admin_masrwf():
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
+    from_date = request.args.get('from_date', datetime.now().replace(day=1).strftime('%Y-%m-%d'))
+    to_date = request.args.get('to_date', datetime.now().strftime('%Y-%m-%d'))
+    rows, existing_types, existing_spenders = [], [], []
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, DATE_FORMAT(masrwf_date, '%%Y/%%m/%%d') AS m_date, DATE_FORMAT(masrwf_date, '%%Y-%%m-%%d') AS m_date_raw, masrwf_type, masrwf_name, spent_by, amount, payment_type, notes FROM masrwf WHERE DATE(masrwf_date) >= %s AND DATE(masrwf_date) <= %s ORDER BY masrwf_date DESC", (from_date, to_date))
+            for r in cur.fetchall():
+                rows.append({
+                    'id': r['id'], 'm_date': r['m_date'], 'm_date_raw': r['m_date_raw'],
+                    'masrwf_type': r.get('masrwf_type') if r.get('masrwf_type') != 'None' else r.get('masrwf_name'),
+                    'spent_by': r.get('spent_by') or '', 'amount': float(r.get('amount') or 0),
+                    'payment_type': r.get('payment_type') or 'نەغد', 'notes': r.get('notes') or ''
+                })
+            cur.execute("SELECT DISTINCT masrwf_type FROM masrwf WHERE masrwf_type IS NOT NULL AND masrwf_type != ''")
+            existing_types = [r['masrwf_type'] for r in cur.fetchall()]
+            cur.execute("SELECT DISTINCT spent_by FROM masrwf WHERE spent_by IS NOT NULL AND spent_by != ''")
+            existing_spenders = [r['spent_by'] for r in cur.fetchall()]
+    except: pass
+    finally: conn.close()
+    return render_template_string(WEB_MASRWF_TEMPLATE, rows=rows, from_date=from_date, to_date=to_date, today_date=datetime.now().strftime('%Y-%m-%d'), existing_types=existing_types, existing_spenders=existing_spenders)
 
-    return render_template_string(
-        WEB_AMAR_TEMPLATE,
-        start_date=start_date,
-        end_date=end_date,
-        report_rows=report_rows,
-        total_sales=total_sales,
-        total_expenses=total_expenses,
-        total_workers_wage=total_workers_wage,
-        total_all_expenses=total_all_expenses,
-        net_profit=net_profit,
-        total_items_count=total_items_count
-    )
+@app.route('/admin/save_masrwf', methods=['POST'])
+def admin_save_masrwf():
+    conn = get_db()
+    try:
+        with conn.cursor() as cur: cur.execute("INSERT INTO masrwf (masrwf_date, masrwf_type, spent_by, amount, payment_type, notes) VALUES (%s, %s, %s, %s, %s, %s)", (request.form.get('masrwf_date'), request.form.get('masrwf_type', ''), request.form.get('spent_by', ''), float(request.form.get('amount', 0)), request.form.get('payment_type', 'نەغد'), request.form.get('notes', '')))
+        conn.commit()
+    except Exception as e: print(e)
+    finally: conn.close()
+    return redirect(url_for('admin_masrwf'))
+
+@app.route('/admin/update_masrwf', methods=['POST'])
+def admin_update_masrwf():
+    conn = get_db()
+    try:
+        with conn.cursor() as cur: cur.execute("UPDATE masrwf SET masrwf_date=%s, masrwf_type=%s, spent_by=%s, amount=%s, payment_type=%s, notes=%s WHERE id=%s", (request.form.get('masrwf_date'), request.form.get('masrwf_type', ''), request.form.get('spent_by', ''), float(request.form.get('amount', 0)), request.form.get('payment_type', 'نەغد'), request.form.get('notes', ''), int(request.form.get('id', 0))))
+        conn.commit()
+    except Exception as e: print(e)
+    finally: conn.close()
+    return redirect(url_for('admin_masrwf'))
+
+@app.route('/admin/delete_masrwf/<int:mid>')
+def admin_delete_masrwf(mid):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur: cur.execute("DELETE FROM masrwf WHERE id=%s", (mid,))
+        conn.commit()
+    except: pass
+    finally: conn.close()
+    return redirect(url_for('admin_masrwf'))
+
+@app.route('/admin/workers')
+def admin_workers():
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
+    start_date = request.args.get('start_date', datetime.now().replace(day=1).strftime('%Y-%m-%d'))
+    end_date = request.args.get('end_date', datetime.now().strftime('%Y-%m-%d'))
+    rows, all_workers = [], []
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT w.id, w.name, w.phone, w.salary, COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) AS work_days, (COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) * w.salary) AS total_salary, IFNULL(SUM(wa.bonus), 0) AS total_bonus, ((COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) * w.salary) + IFNULL(SUM(wa.bonus), 0)) AS total_due FROM workers w LEFT JOIN worker_attendance wa ON w.id = wa.worker_id AND wa.date >= %s AND wa.date <= %s GROUP BY w.id ORDER BY w.id DESC", (start_date, end_date))
+            rows = cur.fetchall()
+            cur.execute("SELECT id, name, salary FROM workers ORDER BY id ASC")
+            for w in cur.fetchall():
+                cur.execute("SELECT status FROM worker_attendance WHERE worker_id = %s ORDER BY date DESC LIMIT 1", (w['id'],))
+                st_row = cur.fetchone()
+                w['last_status'] = st_row['status'] if st_row else 'هاتوو'
+                all_workers.append(w)
+    except: pass
+    finally: conn.close()
+    return render_template_string(WEB_WORKERS_TEMPLATE, wage_rows=rows, all_workers=all_workers, start_date=start_date, end_date=end_date, today_date=datetime.now().strftime('%Y-%m-%d'))
+
+@app.route('/admin/add_worker', methods=['POST'])
+def admin_add_worker():
+    conn = get_db()
+    try:
+        with conn.cursor() as cur: cur.execute("INSERT INTO workers (name, phone, salary) VALUES (%s, %s, %s)", (request.form.get('name'), request.form.get('phone', ''), float(request.form.get('salary', 0))))
+        conn.commit()
+    except: pass
+    finally: conn.close()
+    return redirect(url_for('admin_workers'))
+
+@app.route('/admin/edit_worker/<int:wid>', methods=['POST'])
+def admin_edit_worker(wid):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur: cur.execute("UPDATE workers SET name=%s, salary=%s WHERE id=%s", (request.form.get('name'), float(request.form.get('salary', 0)), wid))
+        conn.commit()
+    except: pass
+    finally: conn.close()
+    return redirect(url_for('admin_workers'))
+
+@app.route('/admin/save_attendance', methods=['POST'])
+def admin_save_attendance():
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            for wid in request.form.getlist('worker_ids'):
+                st = request.form.get(f'status_{wid}', 'هاتوو')
+                bo = float(request.form.get(f'bonus_{wid}', 0) or 0)
+                dt = request.form.get('att_date')
+                cur.execute("INSERT INTO worker_attendance (worker_id, date, status, bonus) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE status=%s, bonus=%s", (wid, dt, st, bo, st, bo))
+        conn.commit()
+    except: pass
+    finally: conn.close()
+    return redirect(url_for('admin_workers'))
+
+@app.route('/admin/delete_worker/<int:wid>')
+def admin_delete_worker(wid):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM worker_attendance WHERE worker_id=%s", (wid,))
+            cur.execute("DELETE FROM workers WHERE id=%s", (wid,))
+        conn.commit()
+    except: pass
+    finally: conn.close()
+    return redirect(url_for('admin_workers'))
 
 @app.route('/admin/users')
 def admin_users():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
     users = []
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM users ORDER BY id DESC")
-            users = cur.fetchall()
-    except Exception as ex:
-        print("Fetch users error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+        with conn.cursor() as cur: cur.execute("SELECT * FROM users ORDER BY id DESC"); users = cur.fetchall()
+    except: pass
+    finally: conn.close()
     return render_template_string(WEB_USERS_TEMPLATE, users=users)
 
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    
-    uname = request.form.get('username', '').strip()
-    pwd = request.form.get('password', '').strip()
-    full_name = request.form.get('full_name', '').strip()
-    role = request.form.get('role', 'Waiter')
-
-    if uname and pwd:
-        conn = None
-        try:
-            conn = get_db()
-            with conn.cursor() as cur:
-                # سڕینەوەی ستوونە زیادەکانی کە کێشەیان دروست دەکرد و گەڕاندنەوەی بۆ باری ئاسایی
-                cur.execute("""
-                    INSERT INTO users (username, password, full_name, role, is_active)
-                    VALUES (%s, %s, %s, %s, 1)
-                """, (uname, pwd, full_name, role))
-                conn.commit()
-        except Exception as ex:
-            print("Insert user error:", ex)
-        finally:
-            if conn:
-                try: conn.close()
-                except: pass
-                
+    conn = get_db()
+    try:
+        with conn.cursor() as cur: cur.execute("INSERT INTO users (username, password, full_name, role) VALUES (%s, %s, %s, %s)", (request.form.get('username'), request.form.get('password'), request.form.get('full_name', ''), request.form.get('role', 'Waiter')))
+        conn.commit()
+    except: pass
+    finally: conn.close()
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/edit_user/<int:uid>', methods=['POST'])
 def admin_edit_user(uid):
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    uname = request.form.get('username', '').strip()
-    pwd = request.form.get('password', '').strip()
-    full_name = request.form.get('full_name', '').strip()
-    role = request.form.get('role', 'Waiter')
-
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE users SET username = %s, password = %s, full_name = %s, role = %s WHERE id = %s
-            """, (uname, pwd, full_name, role, uid))
-            conn.commit()
-    except Exception as ex:
-        print("Update user error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+        with conn.cursor() as cur: cur.execute("UPDATE users SET username=%s, password=%s, full_name=%s, role=%s WHERE id=%s", (request.form.get('username'), request.form.get('password'), request.form.get('full_name', ''), request.form.get('role', 'Waiter'), uid))
+        conn.commit()
+    except: pass
+    finally: conn.close()
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/toggle_user/<int:uid>')
 def admin_toggle_user(uid):
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("SELECT is_active FROM users WHERE id = %s", (uid,))
-            row = cur.fetchone()
-            if row:
-                new_state = 0 if row.get('is_active', 1) else 1
-                cur.execute("UPDATE users SET is_active = %s WHERE id = %s", (new_state, uid))
-                conn.commit()
-    except Exception as ex:
-        print("Toggle user error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+            cur.execute("SELECT is_active FROM users WHERE id=%s", (uid,))
+            r = cur.fetchone()
+            if r: cur.execute("UPDATE users SET is_active=%s WHERE id=%s", (0 if r['is_active'] else 1, uid))
+        conn.commit()
+    except: pass
+    finally: conn.close()
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/delete_user/<int:uid>')
 def admin_delete_user(uid):
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM users WHERE id = %s AND username != 'admin'", (uid,))
-            conn.commit()
-    except Exception as ex:
-        print("Delete user error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+        with conn.cursor() as cur: cur.execute("DELETE FROM users WHERE id=%s AND username!='admin'", (uid,))
+        conn.commit()
+    except: pass
+    finally: conn.close()
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/cashier')
 def admin_cashier():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
     active_tables = []
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            query = """
-                SELECT table_cabin, COUNT(DISTINCT created_at) AS rounds 
-                FROM froshtn 
-                WHERE table_cabin IS NOT NULL AND table_cabin != '' AND table_cabin NOT LIKE '%[%'
-                GROUP BY table_cabin
-            """
-            cur.execute(query)
-            rows = cur.fetchall()
-
-            def sort_key(x):
-                val = str(x['table_cabin'])
-                if val.isdigit():
-                    return (0, int(val))
-                return (1, val)
-
-            active_tables = sorted(rows, key=sort_key)
-    except Exception as ex:
-        print("Cashier tables error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+            cur.execute("SELECT table_cabin, COUNT(DISTINCT created_at) AS rounds FROM froshtn WHERE table_cabin != '' AND table_cabin NOT LIKE '%%[%%' GROUP BY table_cabin")
+            active_tables = sorted(cur.fetchall(), key=lambda x: (0, int(x['table_cabin'])) if str(x['table_cabin']).isdigit() else (1, str(x['table_cabin'])))
+    except: pass
+    finally: conn.close()
     return render_template_string(WEB_CASHIER_TEMPLATE, active_tables=active_tables)
 
 @app.route('/admin/complete_payment', methods=['POST'])
 def admin_complete_payment():
     data = request.get_json() or {}
-    t_num = str(data.get('table_number', '')).strip()
+    t_num = str(data.get('table_number', ''))
     tot = float(data.get('total_amount', 0))
     paid = float(data.get('amount_paid', 0))
     disc = max(0, tot - paid)
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             cur.execute("SELECT food_name, quantity, price FROM froshtn WHERE table_cabin = %s", (t_num,))
-            items_to_print = cur.fetchall()
-
+            items = cur.fetchall()
             p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
-            cur.execute("INSERT INTO qasa (transaction_time, place_id, amount, discount) VALUES (NOW(), %s, %s, %s)", (p_id, paid, disc))
+            cur.execute("INSERT INTO qasa (place_id, amount, discount) VALUES (%s, %s, %s)", (p_id, paid, disc))
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s OR table_cabin LIKE %s", (t_num, f"{t_num} [%"))
-            conn.commit()
-            
-        return jsonify({
-            'status': 'success',
-            'receipt': {
-                'table': t_num,
-                'items': items_to_print,
-                'total': tot,
-                'paid': paid,
-                'time': datetime.now().strftime("%Y/%m/%d %I:%M %p")
-            }
-        })
-    except Exception as ex:
-        return jsonify({'status': 'error', 'message': str(ex)})
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+        conn.commit()
+        return jsonify({'status': 'success', 'receipt': {'table': t_num, 'items': items, 'total': tot, 'paid': paid}})
+    except Exception as e: return jsonify({'status': 'error', 'message': str(e)})
+    finally: conn.close()
+
 @app.route('/admin/qasa')
 def admin_qasa():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
-    rows = []
-    tot_rec, tot_disc = 0, 0
-    conn = None
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
+    rows, tot_rec, tot_disc = [], 0, 0
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("SELECT DATE_FORMAT(transaction_time, '%Y-%m-%d %H:%i') AS transaction_time, place_id, amount, discount FROM qasa ORDER BY transaction_time DESC")
+            cur.execute("SELECT DATE_FORMAT(transaction_time, '%Y-%m-%d %H:%i') as transaction_time, place_id, amount, discount FROM qasa WHERE transaction_time >= NOW() - INTERVAL 1 DAY ORDER BY transaction_time DESC")
             rows = cur.fetchall()
             tot_rec = sum(float(r['amount']) for r in rows)
             tot_disc = sum(float(r['discount']) for r in rows)
-    except Exception as ex:
-        print("Qasa error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+    except: pass
+    finally: conn.close()
     return render_template_string(WEB_QASA_TEMPLATE, qasa_rows=rows, total_received=tot_rec, total_discount=tot_disc)
 
-# ==========================================
-# مەسرووفات (دەستکاریکراو و بەستراو بە تەواوی ستوونەکان)
-# ==========================================
-@app.route('/admin/masrwf')
-def admin_masrwf():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
-    
-    today = datetime.now()
-    today_str = today.strftime('%Y-%m-%d')
-    first_day_of_month = today.replace(day=1).strftime('%Y-%m-%d')
-
-    # دانانی بەرواری دیفۆڵت بۆ ئەوەی خشتەکە بەتاڵ نەبێت و کێشەی MM/DD/YYYY دروست نەبێت
-    from_date = request.args.get('from_date', first_day_of_month).strip()
-    to_date = request.args.get('to_date', today_str).strip()
-
-    rows = []
-    tot = 0
-    total_qarz = 0
-    existing_types = ['کڕینی گۆشت', 'کڕینی سەوزە', 'کڕینی برنج', 'خەرجی گشتی', 'کڕینی پەلەوەر', 'کڕینی مریشکی زیندوو', 'کەلوپەل', 'ئەشیای سەفەری']
-    existing_spenders = ['']
-    
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            query = """
-                SELECT 
-                    id, 
-                    DATE_FORMAT(masrwf_date, '%%Y/%%m/%%d') AS m_date, 
-                    DATE_FORMAT(masrwf_date, '%%Y-%%m-%%d') AS m_date_raw, 
-                    masrwf_type, 
-                    masrwf_name, 
-                    spent_by, 
-                    amount, 
-                    payment_type,
-                    notes 
-                FROM masrwf 
-            """
-            params = []
-            if from_date and to_date:
-                query += " WHERE DATE(masrwf_date) >= %s AND DATE(masrwf_date) <= %s "
-                params.append(from_date)
-                params.append(to_date)
-            
-            query += " ORDER BY masrwf_date DESC, id DESC;"
-            cur.execute(query, params)
-            
-            raw_data = cur.fetchall() or []
-            for r in raw_data:
-                m_type = str(r.get('masrwf_type') or '').strip()
-                m_name = str(r.get('masrwf_name') or '').strip()
-                final_type = m_type if m_type and m_type != 'None' else m_name
-                
-                rows.append({
-                    'id': r['id'],
-                    'm_date': r['m_date'],
-                    'm_date_raw': r['m_date_raw'],
-                    'masrwf_type': final_type,
-                    'spent_by': r.get('spent_by') or '',
-                    'amount': float(r.get('amount') or 0),
-                    'payment_type': r.get('payment_type') or 'نەغد',
-                    'notes': r.get('notes') or ''
-                })
-
-            tot = sum(r['amount'] for r in rows)
-            total_qarz = sum(r['amount'] for r in rows if r['payment_type'] == 'قەرز')
-
-            try:
-                cur.execute("SELECT DISTINCT masrwf_type FROM masrwf WHERE masrwf_type IS NOT NULL AND masrwf_type != '';")
-                for r in cur.fetchall():
-                    val = str(r.get('masrwf_type') or '').strip()
-                    if val and val not in existing_types: existing_types.append(val)
-            except: pass
-
-            try:
-                cur.execute("SELECT DISTINCT masrwf_name FROM masrwf WHERE masrwf_name IS NOT NULL AND masrwf_name != '';")
-                for r in cur.fetchall():
-                    val = str(r.get('masrwf_name') or '').strip()
-                    if val and val not in existing_types: existing_types.append(val)
-            except: pass
-
-            try:
-                cur.execute("SELECT DISTINCT spent_by FROM masrwf WHERE spent_by IS NOT NULL AND spent_by != '';")
-                for r in cur.fetchall():
-                    val = str(r.get('spent_by') or '').strip()
-                    if val and val not in existing_spenders: existing_spenders.append(val)
-            except: pass
-
-    except Exception as ex:
-        print("Masrwf error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-
-    return render_template_string(
-        WEB_MASRWF_TEMPLATE, 
-        rows=rows, 
-        total_m=tot, 
-        total_qarz=total_qarz,
-        today_date=today_str,
-        from_date=from_date,
-        to_date=to_date,
-        existing_types=existing_types,
-        existing_spenders=existing_spenders
-    )
-@app.route('/admin/save_masrwf', methods=['POST'])
-def admin_save_masrwf():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    m_date = request.form.get('masrwf_date')
-    m_type = request.form.get('masrwf_type', '').strip()
-    spent_by = request.form.get('spent_by', '').strip()
-    amt = float(request.form.get('amount', 0))
-    payment_type = request.form.get('payment_type', 'نەغد').strip()
-    notes = request.form.get('notes', '').strip()
-    
-    if amt > 0:
-        conn = None
-        try:
-            conn = get_db()
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO masrwf (masrwf_date, masrwf_name, masrwf_type, spent_by, amount, payment_type, notes) 
-                    VALUES (%s, '', %s, %s, %s, %s, %s)
-                """, (m_date, m_type, spent_by, amt, payment_type, notes))
-                conn.commit()
-        except Exception as ex:
-            print("Save masrwf error:", ex)
-        finally:
-            if conn:
-                try: conn.close()
-                except: pass
-    return redirect(url_for('admin_masrwf'))
-
-@app.route('/admin/update_masrwf', methods=['POST'])
-def admin_update_masrwf():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    m_id = int(request.form.get('id', 0))
-    m_date = request.form.get('masrwf_date')
-    m_type = request.form.get('masrwf_type', '').strip()
-    spent_by = request.form.get('spent_by', '').strip()
-    amt = float(request.form.get('amount', 0))
-    payment_type = request.form.get('payment_type', 'نەغد').strip()
-    notes = request.form.get('notes', '').strip()
-    
-    if m_id > 0 and amt > 0:
-        conn = None
-        try:
-            conn = get_db()
-            with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE masrwf 
-                    SET masrwf_date = %s, masrwf_name = '', masrwf_type = %s, spent_by = %s, amount = %s, payment_type = %s, notes = %s 
-                    WHERE id = %s
-                """, (m_date, m_type, spent_by, amt, payment_type, notes, m_id))
-                conn.commit()
-        except Exception as ex:
-            print("Update masrwf error:", ex)
-        finally:
-            if conn:
-                try: conn.close()
-                except: pass
-    return redirect(url_for('admin_masrwf'))
-
-@app.route('/admin/delete_masrwf/<int:mid>')
-def admin_delete_masrwf(mid):
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        return redirect(url_for('login'))
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM masrwf WHERE id = %s", (mid,))
-            conn.commit()
-    except Exception as ex:
-        print("Delete masrwf error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return redirect(url_for('admin_masrwf'))
-
-# ==========================================
-# بەشی حیساباتی شاگردەکان
-# ==========================================
-@app.route('/admin/workers')
-def admin_workers():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
-
-    today_dt = datetime.now()
-    first_day_of_month = today_dt.replace(day=1).strftime('%Y-%m-%d')
-    today_str = today_dt.strftime('%Y-%m-%d')
-
-    start_date = request.args.get('start_date', first_day_of_month)
-    end_date = request.args.get('end_date', today_str)
-
-    rows = []
-    all_workers = []
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT w.id, w.name, w.phone, w.salary,
-                       COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) AS work_days,
-                       (COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) * w.salary) AS total_salary,
-                       IFNULL(SUM(wa.bonus), 0) AS total_bonus,
-                       ((COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) * w.salary) + IFNULL(SUM(wa.bonus), 0)) AS total_due
-                FROM workers w
-                LEFT JOIN worker_attendance wa ON w.id = wa.worker_id AND wa.date >= %s AND wa.date <= %s
-                GROUP BY w.id, w.name, w.phone, w.salary
-                ORDER BY w.id DESC
-            """, (start_date, end_date))
-            rows = cur.fetchall()
-
-            cur.execute("SELECT id, name, salary FROM workers ORDER BY id ASC")
-            base_workers = cur.fetchall()
-            
-            for w in base_workers:
-                cur.execute("SELECT status FROM worker_attendance WHERE worker_id = %s ORDER BY date DESC LIMIT 1", (w['id'],))
-                st_row = cur.fetchone()
-                w['last_status'] = st_row['status'] if st_row else 'هاتوو'
-                all_workers.append(w)
-
-    except Exception as e:
-        print("Worker list error:", e)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-            
-    return render_template_string(WEB_WORKERS_TEMPLATE, wage_rows=rows, all_workers=all_workers, start_date=start_date, end_date=end_date, today_date=today_str)
-
-@app.route('/admin/add_worker', methods=['POST'])
-def admin_add_worker():
-    name = request.form.get('name')
-    phone = request.form.get('phone', '')
-    salary = float(request.form.get('salary', 25000))
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("INSERT INTO workers (name, phone, salary) VALUES (%s, %s, %s)", (name, phone, salary))
-            conn.commit()
-    except Exception as ex:
-        print("Add worker error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return redirect(url_for('admin_workers'))
-
-@app.route('/admin/edit_worker/<int:wid>', methods=['POST'])
-def admin_edit_worker(wid):
-    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
-    name = request.form.get('name')
-    phone = request.form.get('phone', '')
-    salary = float(request.form.get('salary', 0))
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("UPDATE workers SET name = %s, phone = %s, salary = %s WHERE id = %s", (name, phone, salary, wid))
-            conn.commit()
-    except Exception as ex:
-        print("Edit worker error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return redirect(url_for('admin_workers'))
-
-@app.route('/admin/save_attendance', methods=['POST'])
-def admin_save_attendance():
-    if not session.get('authenticated') or session.get('role') != 'admin': 
-        return redirect(url_for('login'))
-    
-    a_date = request.form.get('att_date')
-    worker_ids = request.form.getlist('worker_ids') 
-    
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            for wid in worker_ids:
-                status = request.form.get(f'status_{wid}', 'هاتوو')
-                bonus_str = request.form.get(f'bonus_{wid}', '0').strip()
-                
-                try:
-                    bonus = float(bonus_str) if bonus_str else 0.0
-                except ValueError:
-                    bonus = 0.0
-                    
-                cur.execute("""
-                    INSERT INTO worker_attendance (worker_id, date, status, bonus)
-                    VALUES (%s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE status = %s, bonus = %s
-                """, (wid, a_date, status, bonus, status, bonus))
-            conn.commit()
-    except Exception as ex:
-        print("Save bulk attendance error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-            
-    return redirect(url_for('admin_workers'))
-
-@app.route('/admin/delete_worker/<int:wid>')
-def admin_delete_worker(wid):
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM worker_attendance WHERE worker_id = %s", (wid,))
-            cur.execute("DELETE FROM workers WHERE id = %s", (wid,))
-            conn.commit()
-    except Exception as ex:
-        print("Delete worker error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return redirect(url_for('admin_workers'))
-# ==========================================
-# بەڕێوەبردنی خواردنەکان (Menu Manager)
-# ==========================================
 @app.route('/admin/menu_manager')
 def admin_menu_manager():
-    if not session.get('authenticated') or session.get('role') != 'admin':
-        session.clear()
-        return redirect(url_for('login'))
-    foods = []
-    categories = ['برژاو', 'کوڵاو', 'پەلەوەر', 'شەربەت و خواردنەوە', 'سەوزە و زەڵاتە', 'کوردیەکان', 'خواردنی خێرا', 'شۆربا', 'شیرینی']
-    conn = None
+    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
+    foods, cats = [], ['برژاو', 'کوڵاو', 'پەلەوەر', 'شەربەت و خواردنەوە', 'سەوزە و زەڵاتە', 'کوردیەکان', 'خواردنی خێرا', 'شۆربا', 'شیرینی']
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("SELECT id, food_name, price, category, image_path FROM nse ORDER BY id DESC")
+            cur.execute("SELECT id, food_name, food_name_ar, food_name_en, price, category, image_path FROM nse ORDER BY id DESC")
             foods = cur.fetchall()
             for f in foods:
-                c = f.get('category')
-                if c and c.strip() and c.strip() not in categories:
-                    categories.append(c.strip())
-    except Exception as ex:
-        print("Menu fetch error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return render_template_string(WEB_MENU_MANAGER_TEMPLATE, foods=foods, existing_categories=categories)
+                if f.get('category') and f['category'] not in cats: cats.append(f['category'])
+    except: pass
+    finally: conn.close()
+    return render_template_string(WEB_MENU_MANAGER_TEMPLATE, foods=foods, existing_categories=cats)
 
 @app.route('/admin/add_food', methods=['POST'])
 def admin_add_food():
     name = request.form.get('food_name')
+    name_ar = request.form.get('food_name_ar', '')
+    name_en = request.form.get('food_name_en', '')
     price = float(request.form.get('price', 0))
-    cat = request.form.get('category', 'گشتی').strip()
-    img = request.form.get('image_path', '').strip()
-
+    cat = request.form.get('category', 'گشتی')
+    img_link = request.form.get('image_path_link', '').strip()
+    
+    img = img_link
     if 'food_image' in request.files:
-        file = request.files['food_image']
-        if file and file.filename != '' and allowed_file(file.filename):
-            fname = secure_filename(f"{int(datetime.now().timestamp())}_{file.filename}")
-            save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-            file.save(save_path)
-            img = url_for('static', filename=f'uploads/{fname}')
-
-    conn = None
+        f = request.files['food_image']
+        if f.filename != '':
+            fn = secure_filename(f"{int(datetime.now().timestamp())}_{f.filename}")
+            f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
+            img = url_for('static', filename=f'uploads/{fn}')
+            
+    conn = get_db()
     try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("INSERT INTO nse (food_name, price, category, image_path, nsecol) VALUES (%s, %s, %s, %s, '')", (name, price, cat, img))
-            conn.commit()
-    except Exception as ex:
-        print("Add food error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+        with conn.cursor() as cur: cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
+        conn.commit()
+    except: pass
+    finally: conn.close()
     return redirect(url_for('admin_menu_manager'))
 
 @app.route('/admin/edit_food/<int:fid>', methods=['POST'])
 def admin_edit_food(fid):
-    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
     name = request.form.get('food_name')
+    name_ar = request.form.get('food_name_ar', '')
+    name_en = request.form.get('food_name_en', '')
     price = float(request.form.get('price', 0))
-    cat = request.form.get('category', 'گشتی').strip()
-    img = request.form.get('image_path', '').strip()
+    cat = request.form.get('category', 'گشتی')
+    img_link = request.form.get('image_path_link', '').strip()
+    
+    final_img = None
+    if 'food_image' in request.files and request.files['food_image'].filename != '':
+        f = request.files['food_image']
+        fn = secure_filename(f"{int(datetime.now().timestamp())}_{f.filename}")
+        f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
+        final_img = url_for('static', filename=f'uploads/{fn}')
+    elif img_link != '':
+        final_img = img_link
 
-    if 'food_image' in request.files:
-        file = request.files['food_image']
-        if file and file.filename != '' and allowed_file(file.filename):
-            fname = secure_filename(f"{int(datetime.now().timestamp())}_{file.filename}")
-            save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-            file.save(save_path)
-            img = url_for('static', filename=f'uploads/{fname}')
-
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            if img:
-                cur.execute("UPDATE nse SET food_name = %s, price = %s, category = %s, image_path = %s WHERE id = %s", (name, price, cat, img, fid))
+            if final_img is not None:
+                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, name_ar, name_en, price, cat, final_img, fid))
             else:
-                cur.execute("UPDATE nse SET food_name = %s, price = %s, category = %s WHERE id = %s", (name, price, cat, fid))
-            conn.commit()
-    except Exception as ex:
-        print("Edit food error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s WHERE id=%s", (name, name_ar, name_en, price, cat, fid))
+        conn.commit()
+    except: pass
+    finally: conn.close()
     return redirect(url_for('admin_menu_manager'))
 
 @app.route('/admin/delete_food/<int:fid>')
 def admin_delete_food(fid):
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM nse WHERE id = %s", (fid,))
-            conn.commit()
-    except Exception as ex:
-        print("Delete food error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+        with conn.cursor() as cur: cur.execute("DELETE FROM nse WHERE id=%s", (fid,))
+        conn.commit()
+    except: pass
+    finally: conn.close()
     return redirect(url_for('admin_menu_manager'))
 
-# ==========================================
-# ڕێڕەوەکانی ئۆردەر و مێزەکان
-# ==========================================
 @app.route('/desktop/tables')
 def desktop_tables():
     if not session.get('authenticated'): return redirect(url_for('login'))
-    active_takeaways = []
-    conn = None
+    tk = []
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT table_cabin FROM froshtn WHERE table_cabin LIKE 'سەفەری%' AND table_cabin NOT LIKE '%%[%%'")
-            active_takeaways = [r['table_cabin'] for r in cur.fetchall()]
-    except Exception as ex:
-        print("Desktop tables error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return render_template_string(DESKTOP_TABLES_TEMPLATE, active_takeaways=active_takeaways)
+            tk = [r['table_cabin'] for r in cur.fetchall()]
+    except: pass
+    finally: conn.close()
+    return render_template_string(DESKTOP_TABLES_TEMPLATE, active_takeaways=tk)
 
 @app.route('/desktop')
 def desktop_menu():
     if not session.get('authenticated'): return redirect(url_for('login'))
     tbl = request.args.get('table')
     if not tbl: return redirect(url_for('desktop_tables'))
-    categories = {}
-    conn = None
+    cats = {}
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            # لێرەدا دەبێت ستوونی id هەبێت
-            cur.execute("SELECT id, food_name, price, category, image_path FROM nse WHERE food_name != ''")
-            for f in cur.fetchall():
-                c = f['category'].strip() if f.get('category') else 'گشتی'
-                categories.setdefault(c, []).append(f)
-    except Exception as ex:
-        print("Desktop menu error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return render_template_string(DESKTOP_TEMPLATE, categories=categories, selected_table=tbl)
-
-@app.route('/transfer_table_orders', methods=['POST'])
-def transfer_table_orders():
-    if not session.get('authenticated'): return jsonify({'status': 'error', 'message': 'ڕێگەپێنەدراو'})
-    data = request.get_json() or {}
-    from_tbl = str(data.get('from_table', '')).strip()
-    to_tbl = str(data.get('to_table', '')).strip()
-
-    if not from_tbl or not to_tbl:
-        return jsonify({'status': 'error', 'message': 'تکایە هەردوو مێز دیاری بکە'})
-
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE froshtn 
-                SET table_cabin = REPLACE(table_cabin, %s, %s)
-                WHERE table_cabin = %s OR table_cabin LIKE %s
-            """, (from_tbl, to_tbl, from_tbl, f"{from_tbl} [%"))
-            conn.commit()
-        return jsonify({'status': 'success'})
-    except Exception as ex:
-        return jsonify({'status': 'error', 'message': str(ex)})
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+            cur.execute("SELECT id, food_name, food_name_ar, food_name_en, price, category, image_path FROM nse WHERE food_name != ''")
+            for f in cur.fetchall(): cats.setdefault(f['category'] or 'گشتی', []).append(f)
+    except: pass
+    finally: conn.close()
+    return render_template_string(DESKTOP_TEMPLATE, categories=cats, selected_table=tbl)
 
 @app.route('/mobile/tables')
 def mobile_waiter_tables():
     if not session.get('authenticated'): return redirect(url_for('login'))
-    active_takeaways = []
-    conn = None
+    tk = []
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT table_cabin FROM froshtn WHERE table_cabin LIKE 'سەفەری%' AND table_cabin NOT LIKE '%%[%%'")
-            active_takeaways = [r['table_cabin'] for r in cur.fetchall()]
-    except Exception as ex:
-        print("Mobile tables error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return render_template_string(MOBILE_TABLES_TEMPLATE, active_takeaways=active_takeaways)
+            tk = [r['table_cabin'] for r in cur.fetchall()]
+    except: pass
+    finally: conn.close()
+    return render_template_string(MOBILE_TABLES_TEMPLATE, active_takeaways=tk)
 
 @app.route('/mobile/menu')
 def mobile_waiter_menu():
     if not session.get('authenticated'): return redirect(url_for('login'))
     tbl = request.args.get('table', '1')
-    categories = {}
-    conn = None
+    cats = {}
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("SELECT id, food_name, price, category, image_path FROM nse WHERE food_name != ''")
-            for f in cur.fetchall():
-                c = f['category'].strip() if f.get('category') else 'گشتی'
-                categories.setdefault(c, []).append(f)
-    except Exception as ex:
-        print("Mobile menu error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return render_template_string(CUSTOMER_MENU_TEMPLATE, table_num=tbl, categories=categories, allow_ordering=True)
+            cur.execute("SELECT id, food_name, food_name_ar, food_name_en, price, category, image_path FROM nse WHERE food_name != ''")
+            for f in cur.fetchall(): cats.setdefault(f['category'] or 'گشتی', []).append(f)
+    except: pass
+    finally: conn.close()
+    return render_template_string(CUSTOMER_MENU_TEMPLATE, table_num=tbl, categories=cats, allow_ordering=True)
 
 @app.route('/table/<path:table_num>')
 def customer_table_view(table_num):
-    allow_ordering = True
-    categories = {}
-    conn = None
+    allow = True
+    cats = {}
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             if table_num.isdigit():
-                cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number = %s", (int(table_num),))
-                row = cur.fetchone()
-                if row:
-                    allow_ordering = bool(row['allow_ordering'])
+                cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number=%s", (int(table_num),))
+                r = cur.fetchone()
+                if r: allow = bool(r['allow_ordering'])
+            cur.execute("SELECT id, food_name, food_name_ar, food_name_en, price, category, image_path FROM nse WHERE food_name != ''")
+            for f in cur.fetchall(): cats.setdefault(f['category'] or 'گشتی', []).append(f)
+    except: pass
+    finally: conn.close()
+    return render_template_string(CUSTOMER_MENU_TEMPLATE, table_num=table_num, categories=cats, allow_ordering=allow)
 
-            cur.execute("SELECT id, food_name, price, category, image_path FROM nse WHERE food_name != ''")
-            foods = cur.fetchall()
-            for f in foods:
-                c = f['category'].strip() if f.get('category') else 'گشتی'
-                categories.setdefault(c, []).append(f)
-    except Exception as ex:
-        print("Customer table view error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-
-    return render_template_string(CUSTOMER_MENU_TEMPLATE, table_num=table_num, categories=categories, allow_ordering=allow_ordering)
 @app.route('/qr_manager')
 def qr_manager():
     if not session.get('authenticated'): return redirect(url_for('login'))
-    perm_dict = {}
-    conn = None
+    pd = {}
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             cur.execute("SELECT table_number, allow_ordering FROM table_permissions")
-            for r in cur.fetchall():
-                perm_dict[r['table_number']] = r['allow_ordering']
-    except Exception as ex:
-        print("QR fetch error:", ex)
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-    return render_template_string(QR_MANAGER_TEMPLATE, base_url=request.host_url.rstrip('/'), perm_dict=perm_dict)
+            for r in cur.fetchall(): pd[r['table_number']] = r['allow_ordering']
+    except: pass
+    finally: conn.close()
+    return render_template_string(QR_MANAGER_TEMPLATE, base_url=request.host_url.rstrip('/'), perm_dict=pd)
 
 @app.route('/toggle_table_permission', methods=['POST'])
 def toggle_table_permission():
-    if not session.get('authenticated'): return jsonify({'status': 'error'})
     t_num = int(request.get_json().get('table_number'))
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number = %s", (t_num,))
-            row = cur.fetchone()
-            new_val = 0 if (row and row['allow_ordering']) else 1
-            cur.execute("INSERT INTO table_permissions (table_number, allow_ordering) VALUES (%s, %s) ON DUPLICATE KEY UPDATE allow_ordering = %s", (t_num, new_val, new_val))
-            conn.commit()
-        return jsonify({'status': 'success', 'allow_ordering': new_val})
-    except Exception as ex:
-        return jsonify({'status': 'error', 'message': str(ex)})
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-
-@app.route('/set_all_table_permissions', methods=['POST'])
-def set_all_table_permissions():
-    if not session.get('authenticated'): return jsonify({'status': 'error'})
-    allow = int(request.get_json().get('allow_ordering', 1))
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            for i in range(1, 91):
-                cur.execute("INSERT INTO table_permissions (table_number, allow_ordering) VALUES (%s, %s) ON DUPLICATE KEY UPDATE allow_ordering = %s", (i, allow, allow))
-            conn.commit()
-        return jsonify({'status': 'success'})
-    except Exception as ex:
-        return jsonify({'status': 'error', 'message': str(ex)})
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
-
-@app.route('/save_customer_order', methods=['POST'])
-def save_customer_order():
-    data = request.get_json() or {}
-    tbl = str(data.get('table_number', ''))
-    items = data.get('cart_items', [])
-    if not items:
-        return jsonify({'status': 'error', 'message': 'هیچ خواردنێک دیاری نەکراوە!'})
-
-    conn = None
-    try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            if tbl.isdigit():
-                cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number = %s", (int(tbl),))
-                p_row = cur.fetchone()
-                if p_row and not p_row['allow_ordering'] and session.get('role') not in ['mobile_waiter', 'admin']:
-                    return jsonify({'status': 'error', 'message': 'ئەم مێزە تەنها بۆ بینینە!'})
-
-            for it in items:
-                fname = it.get('full_name') or it.get('food_name') or it.get('base_name')
-                qty = int(it.get('qty', 1))
-                price = float(it.get('price', 0))
-                cat = it.get('cat', 'گشتی')
-                rice_t = it.get('rice_type', '')
-                chick_p = it.get('chicken_part', '')
-
-                if '(' not in fname:
-                    if cat in ['کوڵاو', 'پەلەوەر', 'کوردیەکان'] and rice_t:
-                        fname += f" ({rice_t})"
-                    if cat == 'پەلەوەر' and chick_p:
-                        fname += f" ({chick_p})"
-
-                cur.execute("SELECT order_id, quantity FROM froshtn WHERE table_cabin = %s AND food_name = %s", (tbl, fname))
-                existing = cur.fetchone()
-                if existing:
-                    new_qty = existing['quantity'] + qty
-                    cur.execute("UPDATE froshtn SET quantity = %s WHERE order_id = %s", (new_qty, existing['order_id']))
-                else:
-                    cur.execute("""
-                        INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) 
-                        VALUES (%s, %s, %s, %s, %s, NOW(), 0)
-                    """, (tbl, fname, qty, price, cat))
-
-            conn.commit()
-        return jsonify({'status': 'success'})
-    except Exception as ex:
-        return jsonify({'status': 'error', 'message': str(ex)})
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+            cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number=%s", (t_num,))
+            r = cur.fetchone()
+            nv = 0 if (r and r['allow_ordering']) else 1
+            cur.execute("INSERT INTO table_permissions (table_number, allow_ordering) VALUES (%s,%s) ON DUPLICATE KEY UPDATE allow_ordering=%s", (t_num, nv, nv))
+        conn.commit()
+        return jsonify({'status': 'success', 'allow_ordering': nv})
+    except: return jsonify({'status': 'error'})
+    finally: conn.close()
 
 @app.route('/save_cart_order', methods=['POST'])
 def save_cart_order():
@@ -4094,7 +2079,6 @@ def save_cart_order():
     cart = data.get('cart_items', [])
     orig = data.get('original_items', [])
 
-    # فەنکشنێک بۆ جیاکردنەوەی خواردنەکان بەپێی ئەوەی دەکەونە کام قاپەوە
     def parse_items(items_list):
         parsed = {}
         plate_idx = 1
@@ -4104,141 +2088,109 @@ def save_cart_order():
             if is_div:
                 plate_idx += 1
             else:
-                # پاشگری قاپەکە دەدەینە پاڵ ناوەکە بۆ ئەوەی تێکەڵ نەبن (بۆ نموونە: کەباب__P1, کەباب__P2)
                 key = f"{fname}__P{plate_idx}"
-                if key not in parsed:
-                    parsed[key] = {'real_name': fname, 'qty': 0, 'price': float(it.get('price', 0)), 'cat': it.get('cat', 'گشتی')}
-                parsed[key]['qty'] += int(it.get('qty', 1))
+                if key not in parsed: parsed[key] = {'real_name': fname, 'qty': 0, 'price': float(it.get('price', 0)), 'cat': it.get('cat', 'گشتی')}
+                parsed[key]['qty'] += float(it.get('qty', 1))
         return parsed
 
     old_map = parse_items(orig)
     new_map = parse_items(cart)
 
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
-            # 1. پشکنینی ئاسایشی مێزەکان
             if tbl.isdigit():
                 cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number = %s", (int(tbl),))
                 p_row = cur.fetchone()
                 if p_row and not p_row['allow_ordering'] and session.get('role') not in ['mobile_waiter', 'admin']:
-                    return jsonify({'status': 'error', 'message': 'ئەم مێزە تەنها بۆ بینینە!'})
+                    return jsonify({'status': 'error', 'message': 'تەنها بۆ بینینە'})
 
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s", (tbl,))
-            
-            # 2. هەڵگرتنی تێکڕای داواکارییەکان بۆ کاشێر و وەسڵ (is_printed = 1)
             for it in cart:
-                fname = str(it.get('full_name') or it.get('food_name') or '')
+                fname = str(it.get('ku') or it.get('full_name') or it.get('food_name') or '')
                 is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname
                 final_name = "─── قاپی نوێ ───" if is_div else fname
-                cur.execute("""
-                    INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) 
-                    VALUES (%s, %s, %s, %s, %s, NOW(), 1)
-                """, (tbl, final_name, it.get('qty', 1), it.get('price', 0), it.get('cat', 'گشتی')))
+                cur.execute("INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) VALUES (%s, %s, %s, %s, %s, NOW(), 1)", (tbl, final_name, float(it.get('qty', 1)), float(it.get('price', 0)), it.get('cat', 'گشتی')))
 
-            # 3. دروستکردنی لیستی مەتبەخ بە ڕیزبەندی دروست تا هێڵەکان نەچنە سەرەوە
             kitchen_inserts = []
             plate_idx = 1
             current_plate_printed = False
 
             for it in cart:
-                fname = str(it.get('full_name') or it.get('food_name') or '')
+                fname = str(it.get('ku') or it.get('full_name') or it.get('food_name') or '')
                 is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname
-                
                 if is_div:
-                    plate_idx += 1
-                    current_plate_printed = False # وا دەکات بۆ ئەم قاپە نوێیە ئامادە بێت هێڵ دابنێت
+                    plate_idx += 1; current_plate_printed = False
                 else:
                     key = f"{fname}__P{plate_idx}"
-                    new_qty = int(it.get('qty', 1))
+                    new_qty = float(it.get('qty', 1))
                     old_qty = old_map.get(key, {}).get('qty', 0)
                     diff = new_qty - old_qty
-                    
                     if diff > 0:
-                        # ئەگەر قاپی نوێیە و هێشتا هێڵەکەمان بۆ پرێنتەر نەناردووە، یەکەمجار هێڵەکە دەنێرین
                         if plate_idx > 1 and not current_plate_printed:
-                            kitchen_inserts.append({
-                                'name': '─── قاپی نوێ ───', 'qty': 1, 'price': 0, 'cat': 'برژاو', 'action': 'add'
-                            })
+                            kitchen_inserts.append({'name': '─── قاپی نوێ ───', 'qty': 1, 'price': 0, 'cat': 'برژاو', 'action': 'add'})
                             current_plate_printed = True
-                        
-                        # پاشان خودی خواردنەکە بەدوای هێڵەکەدا دەنێرین
-                        kitchen_inserts.append({
-                            'name': f"+ {fname}", 'qty': diff, 'price': float(it.get('price', 0)), 'cat': it.get('cat', 'گشتی'), 'action': 'add'
-                        })
+                        kitchen_inserts.append({'name': f"+ {fname}", 'qty': diff, 'price': float(it.get('price', 0)), 'cat': it.get('cat', 'گشتی'), 'action': 'add'})
 
-            # سڕاوەکان لە کۆتایی وەسڵەکەی مەتبەخ دەردەکەون
             for k, old_data in old_map.items():
                 new_qty = new_map.get(k, {}).get('qty', 0)
                 diff = new_qty - old_data['qty']
                 if diff < 0:
-                    kitchen_inserts.append({
-                        'name': f"سڕاوەتەوە: {old_data['real_name']}", 'qty': abs(diff), 'price': old_data['price'], 'cat': old_data['cat'], 'action': 'delete'
-                    })
+                    kitchen_inserts.append({'name': f"سڕاوەتەوە: {old_data['real_name']}", 'qty': abs(diff), 'price': old_data['price'], 'cat': old_data['cat'], 'action': 'delete'})
 
-            # 4. ناردن بۆ داتابەیس بە هەمان ئەو ڕیزبەندییەی دروستمان کرد (is_printed = 0)
             for ki in kitchen_inserts:
                 tbl_suffix = " [زیادکراو]" if ki['action'] == 'add' else " [سڕاوەتەوە]"
-                cur.execute("""
-                    INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) 
-                    VALUES (%s, %s, %s, %s, %s, NOW(), 0)
-                """, (tbl + tbl_suffix, ki['name'], ki['qty'], ki['price'], ki['cat']))
+                cur.execute("INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) VALUES (%s, %s, %s, %s, %s, NOW(), 0)", (tbl + tbl_suffix, ki['name'], float(ki['qty']), float(ki['price']), ki['cat']))
 
-            conn.commit()
+        conn.commit()
         return jsonify({'status': 'success'})
-    except Exception as ex:
-        return jsonify({'status': 'error', 'message': str(ex)})
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+    except Exception as ex: return jsonify({'status': 'error', 'message': str(ex)})
+    finally: conn.close()
+
 @app.route('/get_table_orders/<path:table_num>')
 def get_table_orders(table_num):
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             cur.execute("SELECT food_name, price, quantity, category FROM froshtn WHERE table_cabin = %s", (str(table_num),))
-            orders = cur.fetchall()
-        return jsonify(orders)
+            return jsonify(cur.fetchall())
     except: return jsonify([])
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+    finally: conn.close()
 
 @app.route('/clear_table_orders', methods=['POST'])
 def clear_table_orders():
     tbl = str(request.get_json().get('table_number'))
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM froshtn WHERE table_cabin = %s OR table_cabin LIKE %s", (tbl, f"{tbl} [%"))
-            conn.commit()
+        with conn.cursor() as cur: cur.execute("DELETE FROM froshtn WHERE table_cabin = %s OR table_cabin LIKE %s", (tbl, f"{tbl} [%"))
+        conn.commit()
         return jsonify({'status': 'success'})
-    except Exception as ex:
-        return jsonify({'status': 'error', 'message': str(ex)})
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+    except: return jsonify({'status': 'error'})
+    finally: conn.close()
 
 @app.route('/get_active_tables')
 def get_active_tables():
-    conn = None
+    conn = get_db()
     try:
-        conn = get_db()
         with conn.cursor() as cur:
             cur.execute("SELECT DISTINCT table_cabin FROM froshtn WHERE table_cabin NOT LIKE '%%[%%' AND table_cabin != ''")
-            rows = cur.fetchall()
-        return jsonify([str(r['table_cabin']).strip() for r in rows])
+            return jsonify([str(r['table_cabin']).strip() for r in cur.fetchall()])
     except: return jsonify([])
-    finally:
-        if conn:
-            try: conn.close()
-            except: pass
+    finally: conn.close()
+
+@app.route('/transfer_table_orders', methods=['POST'])
+def transfer_table_orders():
+    data = request.get_json() or {}
+    f_tbl = str(data.get('from_table', '')).strip()
+    t_tbl = str(data.get('to_table', '')).strip()
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE froshtn SET table_cabin = REPLACE(table_cabin, %s, %s) WHERE table_cabin = %s OR table_cabin LIKE %s", (f_tbl, t_tbl, f_tbl, f"{f_tbl} [%"))
+        conn.commit()
+        return jsonify({'status': 'success'})
+    except Exception as ex: return jsonify({'status': 'error', 'message': str(ex)})
+    finally: conn.close()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -2,8 +2,10 @@ from flask import Flask, render_template_string, request, jsonify, redirect, url
 from datetime import timedelta, datetime
 from werkzeug.utils import secure_filename
 import pymysql
+import pymysql.cursors
 import os
 import re
+import base64
 
 app = Flask(__name__)
 app.secret_key = 'shahoor_all_in_one_pos_2026_v10'
@@ -30,7 +32,6 @@ DB_CONFIG = {
 
 def get_db():
     conn = pymysql.connect(**DB_CONFIG)
-    conn.ping(reconnect=True)
     return conn
 
 def normalize_digits(text):
@@ -47,6 +48,10 @@ def ensure_all_tables():
         with conn.cursor() as cursor:
             cursor.execute("""CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL UNIQUE, password VARCHAR(100) NOT NULL, full_name VARCHAR(150) DEFAULT '', role VARCHAR(50) DEFAULT 'Waiter', can_view_menu TINYINT DEFAULT 1, can_view_tables TINYINT DEFAULT 1, can_view_cashier TINYINT DEFAULT 0, can_view_qsa TINYINT DEFAULT 0, can_view_reports TINYINT DEFAULT 0, can_view_settings TINYINT DEFAULT 0, is_active TINYINT DEFAULT 1);""")
             cursor.execute("""CREATE TABLE IF NOT EXISTS nse (id INT AUTO_INCREMENT PRIMARY KEY, food_name VARCHAR(255) NOT NULL, price DECIMAL(18, 0) NOT NULL DEFAULT 0, category VARCHAR(150) DEFAULT 'گشتی', image_path TEXT, nsecol VARCHAR(50) DEFAULT '');""")
+            
+            # گۆڕینی ستوونی وێنە بۆ LONGTEXT بۆ ئەوەی جێگەی وێنەی Base64 ببێتەوە لە Railway
+            try: cursor.execute("ALTER TABLE nse MODIFY COLUMN image_path LONGTEXT;")
+            except: pass
             
             try: cursor.execute("ALTER TABLE nse ADD COLUMN food_name_ar VARCHAR(255) DEFAULT '';")
             except: pass
@@ -111,6 +116,14 @@ COMMON_HEAD = """
     [data-theme="darkred"] { --bg: #2a0808; --card: #450a0a; --primary: #fca5a5; --accent: #f87171; --border: #7f1d1d; }
     [data-theme="gold"] { --bg: #1c1400; --card: #382700; --primary: #fbbf24; --accent: #f59e0b; --border: #78350f; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Kufi Arabic', sans-serif; transition: background 0.3s, border-color 0.3s; }
+    
+    /* ستايلی هاوبەش بۆ دوگمەی خێرای تێبینی */
+    .btn-quick-note { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight:bold; flex: 1 1 30%; text-align: center; transition: 0.2s; }
+    .btn-quick-note:hover, .btn-quick-note:active { background: var(--primary); color: #000; border-color: var(--primary); transform: scale(0.95); }
+    
+    /* ستايلی حاسیبەکە (Numpad) */
+    .btn-num { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn-num:active { background: var(--primary); color: #000; }
 </style>
 <script>
     window.savedTheme = localStorage.getItem('theme') || 'luxury';
@@ -148,10 +161,6 @@ COMMON_HEAD = """
     }
 </script>
 """
-
-# ==========================================
-# 5. پەڕەکانی HTML (Templates)
-# ==========================================
 
 # ----------------- Login -----------------
 LOGIN_TEMPLATE = COMMON_HEAD + """
@@ -256,22 +265,33 @@ ADMIN_DASHBOARD_TEMPLATE = COMMON_HEAD + """
     <title>داشبۆردی سەرەکی</title>
     <style>
         body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
-        .admin-nav { background: var(--card); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .admin-nav { background: linear-gradient(90deg, var(--card), var(--bg)); box-shadow: 0 4px 15px rgba(0,0,0,0.4); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: none; z-index: 10; }
         .admin-brand { font-size: 20px; font-weight: 800; color: var(--primary); }
-        .btn-exit { background: var(--danger); color: #fff; text-decoration: none; padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 13px; }
+        .btn-exit { background: var(--danger); color: #fff; text-decoration: none; padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 13px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); transition: 0.2s; }
+        .btn-exit:hover { transform: scale(1.05); }
         .admin-content { flex: 1; padding: 30px 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 32px; }
-        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: flex; align-items: center; justify-content: space-between; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 40px; }
+        .stat-card { border: 1px solid var(--border); border-radius: 18px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; justify-content: space-between; position: relative; overflow: hidden; }
+        
+        .stat-card.c1 { background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(0,0,0,0.4) 100%); border-left: 5px solid var(--accent); }
+        .stat-card.c2 { background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(0,0,0,0.4) 100%); border-left: 5px solid var(--danger); }
+        .stat-card.c3 { background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(0,0,0,0.4) 100%); border-left: 5px solid var(--primary); }
+        .stat-card.c4 { background: linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(0,0,0,0.4) 100%); border-left: 5px solid #38bdf8; }
+        
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.3); }
         .stat-info { display: flex; flex-direction: column; gap: 8px; }
-        .stat-label { font-size: 13px; font-weight: 700; color: #94A3B8; }
+        .stat-label { font-size: 13px; font-weight: 700; color: #cbd5e1; }
         .stat-value { font-size: 24px; font-weight: 800; }
+        
         .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-        .module-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; text-decoration: none; color: var(--text); display: flex; flex-direction: column; gap: 12px; transition: 0.2s; }
-        .module-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .module-card { background: linear-gradient(180deg, var(--card) 0%, rgba(0,0,0,0.2) 100%); box-shadow: 0 6px 15px rgba(0,0,0,0.15); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 18px; border: 1px solid var(--border); padding: 24px; text-decoration: none; color: var(--text); display: flex; flex-direction: column; gap: 12px; position: relative; overflow: hidden; }
+        .module-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent, rgba(255,255,255,0.03)); pointer-events: none; }
+        .module-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 15px 35px rgba(0,0,0,0.4); border-color: var(--primary); z-index: 10; }
         .module-top { display: flex; align-items: center; justify-content: space-between; }
-        .module-icon { font-size: 32px; }
-        .module-badge { background: var(--accent); color: #000; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 8px; }
-        .module-title { font-size: 16px; font-weight: 800; color: var(--primary); }
+        .module-icon { font-size: 38px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); transition: transform 0.3s; }
+        .module-card:hover .module-icon { transform: scale(1.1) rotate(5deg); }
+        .module-badge { background: var(--accent); color: #000; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .module-title { font-size: 16px; font-weight: 800; color: var(--primary); margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -284,10 +304,10 @@ ADMIN_DASHBOARD_TEMPLATE = COMMON_HEAD + """
     </header>
     <main class="admin-content">
         <div class="stats-grid">
-            <div class="stat-card"><div class="stat-info"><span class="stat-label">💰 فرۆشی ئەمڕۆ</span><span class="stat-value" style="color: var(--accent);">{{ "{:,.0f}".format(today_sales) }} د.ع</span></div><div class="module-icon">📈</div></div>
-            <div class="stat-card"><div class="stat-info"><span class="stat-label">💸 مەسرووفی ئەمڕۆ</span><span class="stat-value" style="color: var(--danger);">{{ "{:,.0f}".format(today_expense) }} د.ع</span></div><div class="module-icon">🧾</div></div>
-            <div class="stat-card"><div class="stat-info"><span class="stat-label">🛎️ مێزە کراوەکان</span><span class="stat-value" style="color: var(--primary);">{{ active_tables_count }} مێز</span></div><div class="module-icon">🍽️</div></div>
-            <div class="stat-card"><div class="stat-info"><span class="stat-label">👥 ژمارەی شاگرد</span><span class="stat-value" style="color: #38bdf8;">{{ total_workers }} شاگرد</span></div><div class="module-icon">👤</div></div>
+            <div class="stat-card c1"><div class="stat-info"><span class="stat-label">💰 فرۆشی ئەمڕۆ</span><span class="stat-value" style="color: var(--accent);">{{ "{:,.0f}".format(today_sales) }} د.ع</span></div><div class="module-icon">📈</div></div>
+            <div class="stat-card c2"><div class="stat-info"><span class="stat-label">💸 مەسرووفی ئەمڕۆ</span><span class="stat-value" style="color: var(--danger);">{{ "{:,.0f}".format(today_expense) }} د.ع</span></div><div class="module-icon">🧾</div></div>
+            <div class="stat-card c3"><div class="stat-info"><span class="stat-label">🛎 مێزە کراوەکان</span><span class="stat-value" style="color: var(--primary);">{{ active_tables_count }} مێز</span></div><div class="module-icon">🍽️</div></div>
+            <div class="stat-card c4"><div class="stat-info"><span class="stat-label">👥 ژمارەی شاگرد</span><span class="stat-value" style="color: #38bdf8;">{{ total_workers }} شاگرد</span></div><div class="module-icon">👤</div></div>
         </div>
 
         <div class="modules-grid">
@@ -331,7 +351,7 @@ WEB_AMAR_TEMPLATE = COMMON_HEAD + """
 <body>
     <div class="top-bar">
         <h2 style="color:var(--primary); font-size: 18px;" data-tr="reports">📊 ڕاپۆرتی ئامار و قازانج</h2>
-        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅️ داشبۆرد</a>
+        <a href="/admin" class="btn-dash" data-tr="dashboard">⬅ داشبۆرد</a>
     </div>
     <form method="GET" action="/admin/amar" class="filter-card">
         <input type="date" name="start_date" class="date-input" value="{{ start_date }}" required>
@@ -487,7 +507,7 @@ WEB_WORKERS_TEMPLATE = COMMON_HEAD + """
         .input-group label { display: block; font-size: 12px; color: #94A3B8; margin-bottom: 5px; }
         .c-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; outline: none; }
         .btn-action { background: var(--accent); color: #000; padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .worker-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 10px; }
+        .worker-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
         .modal { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
         .m-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; }
     </style>
@@ -515,7 +535,7 @@ WEB_WORKERS_TEMPLATE = COMMON_HEAD + """
                 {% for w in wage_rows %}
                 <tr>
                     <td style="color:var(--accent); font-weight:bold;">{{ w.name }}</td><td>{{ "{:,.0f}".format(w.salary) }}</td>
-                    <td>{{ w.work_days }}</td><td>{{ "{:,.0f}".format(w.total_salary) }}</td>
+                    <td>{{ "{:,.1f}".format(w.work_days or 0).rstrip('0').rstrip('.') }}</td><td>{{ "{:,.0f}".format(w.total_salary) }}</td>
                     <td style="color:var(--primary);">{{ "{:,.0f}".format(w.total_bonus) }}</td>
                     <td style="color:var(--accent); font-weight:bold;">{{ "{:,.0f}".format(w.total_due) }}</td>
                     <td>
@@ -534,9 +554,12 @@ WEB_WORKERS_TEMPLATE = COMMON_HEAD + """
             {% for aw in all_workers %}
             <div class="worker-row">
                 <input type="hidden" name="worker_ids" value="{{ aw.id }}">
-                <div style="font-weight:bold; width: 150px;">{{ aw.name }}</div>
-                <div><label><input type="radio" name="status_{{ aw.id }}" value="هاتوو" {{ 'checked' if aw.last_status != 'نەهاتوو' else '' }}> هاتوو</label></div>
-                <div><label><input type="radio" name="status_{{ aw.id }}" value="نەهاتوو" {{ 'checked' if aw.last_status == 'نەهاتوو' else '' }}> نەهاتوو</label></div>
+                <div style="font-weight:bold; width: 150px; color:var(--primary);">{{ aw.name }}</div>
+                <div style="display:flex; gap:15px; flex:1; align-items:center;">
+                    <label style="cursor:pointer;"><input type="radio" name="status_{{ aw.id }}" value="هاتوو" {{ 'checked' if aw.last_status not in ['نەهاتوو', 'نیوو شەفت'] else '' }}> هاتوو</label>
+                    <label style="cursor:pointer; color:var(--accent);"><input type="radio" name="status_{{ aw.id }}" value="نیوو شەفت" {{ 'checked' if aw.last_status == 'نیوو شەفت' else '' }}> نیوو شەفت</label>
+                    <label style="cursor:pointer; color:var(--danger);"><input type="radio" name="status_{{ aw.id }}" value="نەهاتوو" {{ 'checked' if aw.last_status == 'نەهاتوو' else '' }}> نەهاتوو</label>
+                </div>
                 <div><input type="number" name="bonus_{{ aw.id }}" class="c-input" value="0" placeholder="بەخشش" style="width:100px;"></div>
             </div>
             {% endfor %}
@@ -636,7 +659,7 @@ WEB_USERS_TEMPLATE = COMMON_HEAD + """
                     <td><a href="/admin/toggle_user/{{ u.id }}" style="color:{{ 'var(--accent)' if u.is_active else 'var(--danger)' }}; text-decoration:none;">{{ 'کارا' if u.is_active else 'بلۆک' }}</a></td>
                     <td>
                         <button style="background:#3b82f6; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="openEdit({{ u.id }}, '{{ u.username }}', '{{ u.password }}', '{{ u.full_name }}', '{{ u.role }}')">دەستکاری</button>
-                        {% if u.username != 'admin' %}<a href="/admin/delete_user/{{ u.id }}" style="color:var(--danger); text-decoration:none; margin-right:5px;" onclick="return confirm('سڕینەوە؟')">🗑️</a>{% endif %}
+                        {% if u.username != 'admin' %}<a href="/admin/delete_user/{{ u.id }}" style="color:var(--danger); text-decoration:none; margin-right:5px;" onclick="return confirm('سڕینەوە؟')">🗑</a>{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -766,7 +789,7 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
             <table style="width:100%"><tr><th class="r">خواردن</th><th>بڕ</th><th>کۆ</th></tr>`;
             d.items.forEach(it => { h += `<tr><td class="r">${it.food_name||it[0]}</td><td>${parseFloat(it.quantity||it[1])}</td><td>${(it.price||it[2])*parseFloat(it.quantity||it[1])}</td></tr>`; });
             h += `</table><div class="line"></div><div style="text-align:right">کۆی گشتی: ${d.total}</div><div style="text-align:right">وەرگیراو: ${d.paid}</div>
-            <div class="line"></div><div>سوپاس!</div><script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}<\/script></body></html>`;
+            <div class="line"></div><div>سوپاس!</div><script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}<\\/script></body></html>`;
             win.document.write(h); win.document.close();
             document.getElementById('chModal').style.display='none'; setTimeout(()=>location.reload(), 1000);
         }
@@ -831,7 +854,7 @@ WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
         .c-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 8px; outline: none; margin-bottom: 10px; }
         .f-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
         .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; }
-        .f-img { width: 100%; height: 130px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
+        .f-img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
         .modal { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.8); display:none; align-items:center; justify-content:center; z-index: 1000; padding: 20px; }
         .m-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; }
     </style>
@@ -979,7 +1002,7 @@ DESKTOP_TABLES_TEMPLATE = COMMON_HEAD + """
         <h2 style="color:var(--primary); font-size:18px;">تکایە مێزێک هەڵبژێرە</h2>
         <div style="display:flex; gap:10px;">
             {% if session.get('role') == 'admin' %}<a href="/admin" class="btn-take" style="background:var(--accent); color:#000;">داشبۆرد</a>{% endif %}
-            <button class="btn-take" onclick="let n=prompt('ناوی کڕیار:'); if(n) location.href='/desktop?table='+encodeURIComponent('سەفەری ('+n+')')">سەفەری 🛵</button>
+            <button class="btn-take" onclick="let n=prompt('ناوی کڕیار (یان ناونیشان):'); if(n) { let p=prompt('ژمارەی مۆبایل:'); let res = p ? n + ' - ' + p : n; location.href='/desktop?table='+encodeURIComponent('سەفەری ('+res+')'); }">سەفەری 🛵</button>
         </div>
     </div>
     <div class="g" id="tg">
@@ -1034,18 +1057,20 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         .cat-visual-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; pointer-events: none; }
         .cat-visual-title { font-size: 11px; font-weight: bold; color: #fff; pointer-events: none; }
 
-        .food-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; overflow-y: auto; padding-right: 5px; align-content: start; padding-bottom: 20px; }
-        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; cursor: pointer; transition: 0.1s; display: flex; flex-direction: column; justify-content: space-between; min-height: 220px; }
-        .f-card:active { transform: scale(0.97); }
-        .f-img { width: 100%; height: 130px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; pointer-events: none; }
-        .f-name { font-size: 14px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
-        .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 2px; pointer-events: none; }
-        .opt-select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 4px; font-size: 11px; outline: none; }
+        .food-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; overflow-y: auto; padding-right: 5px; align-content: start; padding-bottom: 20px; }
+        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; text-align: center; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-start; height: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: transform 0.2s; }
+        .f-card:active { transform: scale(0.96); }
+        .f-img { width: 100%; height: 120px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; flex-shrink: 0; }
+        .f-name { font-size: 13px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
+        .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 10px; pointer-events: none; }
         
         #toastMsg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 1000; display: none; }
 
         .modal-transfer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
         .modal-transfer-box { background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 20px; width: 100%; max-width: 360px; color: #fff; text-align: center; }
+        
+        /* Modal for Notes */
+        .modal-note { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
     </style>
 </head>
 <body dir="rtl">
@@ -1090,28 +1115,70 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
                 {% for cat, items in categories.items() %}
                 {% set cat_idx = loop.index %}
                 {% for it in items %}
-                {% set c_name = (it.category or '') | replace('ي', 'ی') | trim %}
-                {% set show_fish = ('ماسی' in c_name or 'ماسی' in it.food_name) %}
+                
                 <div class="f-card cat-item cat-{{ cat_idx }}" onclick="addF('{{ it.food_name | replace("'", "\\'") }}', {{ it.price }}, '{{ (it.category or '') | replace("'", "\\'") }}', {{ it.id }})">
                     <img src="{{ it.image_path if it.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="f-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'">
                     <div class="f-name food-title-disp" data-ku="{{ it.food_name }}" data-ar="{{ it.food_name_ar or it.food_name }}" data-en="{{ it.food_name_en or it.food_name }}">{{ it.food_name }}</div>
                     <div class="f-price">{{ "{:,.0f}".format(it.price) }}</div>
-                    
-                    {% set show_r = ('کوڵاو' in c_name or 'پەلەوەر' in c_name or 'کورد' in c_name) %}
-                    {% set show_c = ('پەلەوەر' in c_name or 'مریشک' in c_name) %}
-                    {% if show_r or show_c or show_fish %}
-                    <div style="display:flex; gap:4px; width:100%;">
-                        {% if show_fish %}
-                        <input type="number" id="w_{{it.id}}" class="opt-select" step="0.25" min="0.25" value="1" onclick="event.stopPropagation()" placeholder="کێش">
-                        {% endif %}
-                        {% if show_r %}<select class="opt-select" id="r_{{it.id}}" onclick="event.stopPropagation()"><option value="">ج. برنج</option><option value="درێژ">درێژ</option><option value="خڕ">خڕ</option><option value="کوردی">کوردی</option></select>{% endif %}
-                        {% if show_c %}<select class="opt-select" id="c_{{it.id}}" onclick="event.stopPropagation()"><option value="">ب. مریشک</option><option value="سینگ">سینگ</option><option value="ڕان">ڕان</option></select>{% endif %}
-                    </div>
-                    {% endif %}
                 </div>
                 {% endfor %}
                 {% endfor %}
             </div>
+        </div>
+    </div>
+
+    <!-- Note Modal -->
+    <div class="modal-note" id="noteModal">
+        <div class="m-box" style="background:var(--card); border:1px solid var(--border); border-radius:16px; max-width: 400px; width:100%; display: flex; flex-direction: column; gap: 15px; padding: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                <h3 style="color:var(--primary); margin:0; font-size:16px;">✏️ زیادکردنی تێبینی</h3>
+                <span style="color:var(--danger); cursor:pointer; font-weight:bold; font-size:20px;" onclick="closeNoteModal()">✕</span>
+            </div>
+            
+            <div style="display:flex; flex-wrap:wrap; gap:6px;" id="quickNotes">
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی درێژ')">برنجی درێژ</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
+                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
+                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ١')">قاپی ١</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٢')">قاپی ٢</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٣')">قاپی ٣</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٤')">قاپی ٤</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٥')">قاپی ٥</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٦')">قاپی ٦</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٧')">قاپی ٧</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٨')">قاپی ٨</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٩')">قاپی ٩</button>
+            </div>
+
+            <!-- Numpad for Fish Weight -->
+            <div id="fishWeightSection" style="display:none; flex-direction:column; gap:10px;">
+                <label style="color:var(--primary); font-size:14px; font-weight:bold; text-align:center;">کێش دیاری بکە (کیلۆگڕام):</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="fishWeightInput" readonly style="flex:1; background:var(--bg); border:1px solid var(--border); color:#fff; padding:12px; border-radius:8px; font-size:20px; text-align:center; font-weight:bold;">
+                    <button class="btn-num" style="background:var(--danger); padding:12px 20px;" onclick="document.getElementById('fishWeightInput').value=''">C</button>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px;">
+                    <button type="button" class="btn-num" onclick="appendNum('1')">1</button>
+                    <button type="button" class="btn-num" onclick="appendNum('2')">2</button>
+                    <button type="button" class="btn-num" onclick="appendNum('3')">3</button>
+                    <button type="button" class="btn-num" onclick="appendNum('4')">4</button>
+                    <button type="button" class="btn-num" onclick="appendNum('5')">5</button>
+                    <button type="button" class="btn-num" onclick="appendNum('6')">6</button>
+                    <button type="button" class="btn-num" onclick="appendNum('7')">7</button>
+                    <button type="button" class="btn-num" onclick="appendNum('8')">8</button>
+                    <button type="button" class="btn-num" onclick="appendNum('9')">9</button>
+                    <button type="button" class="btn-num" onclick="appendNum('.')">.</button>
+                    <button type="button" class="btn-num" onclick="appendNum('0')">0</button>
+                    <button type="button" class="btn-num" onclick="appendNum('00')">00</button>
+                </div>
+            </div>
+
+            <input type="text" id="customNoteInput" class="c-input" placeholder="یان لێرە بە دەست بنووسە..." style="padding:12px; width:100%; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px; font-family:inherit; margin-top:10px;">
+            
+            <button style="background:var(--accent); color:#000; padding:12px; border:none; border-radius:10px; font-weight:bold; font-size:15px; width:100%; cursor:pointer; margin-top:5px;" onclick="saveNote()">تۆمارکردن</button>
         </div>
     </div>
 
@@ -1130,6 +1197,7 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
 
     <script>
         let cart = [], orig = []; const tbl = "{{ selected_table }}";
+        let editingNoteIdx = -1;
 
         window.addEventListener('langChanged', () => {
             let l = window.savedLang;
@@ -1145,25 +1213,17 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         }
 
         function addF(n, p, c, id) {
-            let fn = n, pts = [];
-            let rel = document.getElementById('r_'+id), cel = document.getElementById('c_'+id);
-            if(rel && rel.value) pts.push(rel.value);
-            if(cel && cel.value) pts.push(cel.value);
-            if(pts.length>0) fn += ` (${pts.join(' - ')})`;
-            
-            let qtyToAdd = 1;
-            let wEl = document.getElementById('w_'+id);
-            if(wEl && wEl.value) {
-                let w = parseFloat(wEl.value);
-                if(!isNaN(w) && w > 0) qtyToAdd = w;
-            }
-
+            let fn = n;
+            let isFish = c.includes('ماسی') || n.includes('ماسی');
             let fd = false;
-            for(let i=cart.length-1; i>=0; i--) {
-                if(cart[i].is_divider) break;
-                if(cart[i].ku === fn) { cart[i].qty += qtyToAdd; fd=true; break; }
+            
+            if(!isFish) {
+                for(let i=cart.length-1; i>=0; i--) {
+                    if(cart[i].is_divider) break;
+                    if(cart[i].ku === fn) { cart[i].qty += 1; fd=true; break; }
+                }
             }
-            if(!fd) cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:qtyToAdd, cat:c});
+            if(!fd) cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:1, cat:c});
             ren();
         }
 
@@ -1176,13 +1236,69 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         }
         function delI(idx) { cart.splice(idx, 1); ren(); }
 
+        function appendNum(val) {
+            let inp = document.getElementById('fishWeightInput');
+            if (val === '.' && inp.value.includes('.')) return;
+            inp.value += val;
+        }
+
         function editNote(idx) {
-            let note = prompt('تێبینی (بۆ نموونە: بێ پیاز):');
-            if (note && note.trim() !== '') {
-                cart[idx].ku += ' (' + note.trim() + ')';
-                cart[idx].full_name = cart[idx].ku;
+            editingNoteIdx = idx;
+            document.getElementById('customNoteInput').value = '';
+            
+            let cat = cart[idx].cat || '';
+            let n = cart[idx].ku || '';
+            let isGrill = cat.includes('برژاو') || n.includes('کەباب') || n.includes('تکە');
+            let isPoultry = cat.includes('پەلەوەر') || n.includes('مریشک');
+            let isBoiled = cat.includes('کوڵاو') || cat.includes('کورد') || cat.includes('شۆربا');
+            let isFish = cat.includes('ماسی') || n.includes('ماسی');
+
+            if (isFish) {
+                document.getElementById('quickNotes').style.display = 'none';
+                document.getElementById('fishWeightSection').style.display = 'flex';
+                document.getElementById('fishWeightInput').value = cart[idx].qty;
+            } else {
+                document.getElementById('fishWeightSection').style.display = 'none';
+                document.getElementById('quickNotes').style.display = 'flex';
+                document.querySelectorAll('#quickNotes .btn-quick-note').forEach(b => {
+                    b.style.display = 'none';
+                    if (isGrill && b.classList.contains('qn-grill')) b.style.display = '';
+                    if (isPoultry && (b.classList.contains('qn-rice') || b.classList.contains('qn-chicken'))) b.style.display = '';
+                    if (isBoiled && !isPoultry && b.classList.contains('qn-rice')) b.style.display = '';
+                    if (!isGrill && !isPoultry && !isBoiled && !isFish) b.style.display = '';
+                });
+            }
+            
+            document.getElementById('noteModal').style.display = 'flex';
+        }
+        
+        function closeNoteModal() {
+            document.getElementById('noteModal').style.display = 'none';
+            editingNoteIdx = -1;
+        }
+        
+        function addNoteText(txt) {
+            let inp = document.getElementById('customNoteInput');
+            inp.value = inp.value ? inp.value + ' - ' + txt : txt;
+        }
+        
+        function saveNote() {
+            if (editingNoteIdx > -1) {
+                let note = document.getElementById('customNoteInput').value;
+                if (note && note.trim() !== '') {
+                    cart[editingNoteIdx].ku += ' (' + note.trim() + ')';
+                    cart[editingNoteIdx].full_name = cart[editingNoteIdx].ku;
+                }
+                
+                if (document.getElementById('fishWeightSection').style.display !== 'none') {
+                    let w = parseFloat(document.getElementById('fishWeightInput').value);
+                    if (!isNaN(w) && w > 0) {
+                        cart[editingNoteIdx].qty = w;
+                    }
+                }
                 ren();
             }
+            closeNoteModal();
         }
 
         function addDiv() {
@@ -1206,7 +1322,7 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
                         <div class="c-ctrl">
                             <span style="color:var(--accent); font-size:12px; font-weight:bold; margin-left:10px;">${(it.price*it.qty).toLocaleString()}</span>
                             <button class="c-btn" style="background:#ef4444; font-size:12px;" onclick="delI(${i})">🗑</button>
-                            <button class="c-btn" style="background:#3b82f6; font-size:12px;" onclick="editNote(${i})">✏️</button>
+                            <button class="c-btn" style="background:#3b82f6; font-size:12px;" onclick="editNote(${i})">✏</button>
                             <button class="c-btn" onclick="updQ(${i},-1)">-</button>
                             <span style="width:30px;text-align:center;font-weight:bold;font-size:14px;">${parseFloat(it.qty.toFixed(3))}</span>
                             <button class="c-btn add" onclick="updQ(${i},1)">+</button>
@@ -1276,12 +1392,12 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
         .c-btn.act { border-color: var(--primary); background: rgba(0,0,0,0.3); color: var(--primary); }
         .cat-visual-img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; }
         
-        .f-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 15px; }
-        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; }
-        .f-img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
-        .f-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+        .f-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 15px; }
+        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; text-align: center; display: flex; flex-direction: column; justify-content: flex-start; height: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: transform 0.2s; }
+        .f-img { width: 100%; height: 120px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; flex-shrink: 0; }
+        .f-name { font-size: 13px; font-weight: bold; margin-bottom: 4px; line-height: 1.3; }
         .f-price { color: var(--accent); font-weight: bold; font-size: 12px; margin-bottom: 8px; }
-        .opt-select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--primary); border-radius:6px; padding:4px; font-size:11px; outline:none; margin-bottom:6px; }
+        
         .stp { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 2px; }
         .s-btn { width: 30px; height: 30px; border: none; border-radius: 6px; background: #334155; color: #fff; font-weight: bold; font-size: 18px; }
         .s-btn.add { background: var(--primary); color: #000; }
@@ -1295,6 +1411,9 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
         
         .wl-lang-btn { background: var(--card); border: 2px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 10px; font-weight: bold; font-size:14px; cursor:pointer; }
         .wl-lang-btn.active { border-color: var(--primary); background: rgba(0,0,0,0.3); color: var(--primary); }
+        
+        /* Modal for Notes */
+        .modal-note { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
     </style>
 </head>
 <body>
@@ -1343,19 +1462,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
             <div class="f-name food-title-disp" data-ku="{{ it.food_name }}" data-ar="{{ it.food_name_ar or it.food_name }}" data-en="{{ it.food_name_en or it.food_name }}">{{ it.food_name }}</div>
             <div class="f-price">{{ "{:,.0f}".format(it.price) }}</div>
             {% if allow_ordering %}
-            {% set c_name = (it.category or '') | replace('ي', 'ی') | trim %}
-            {% set show_fish = ('ماسی' in c_name or 'ماسی' in it.food_name) %}
-            {% set show_r = ('کوڵاو' in c_name or 'پەلەوەر' in c_name or 'کورد' in c_name) %}
-            {% set show_c = ('پەلەوەر' in c_name or 'مریشک' in c_name) %}
-            
-            {% if show_r or show_c or show_fish %}
-                {% if show_fish %}
-                <input type="number" id="w_{{it.id}}" class="opt-select" step="0.25" min="0.25" value="1" onclick="event.stopPropagation()" placeholder="کێش">
-                {% endif %}
-                {% if show_r %}<select class="opt-select" id="rm_{{it.id}}"><option value="">ج. برنج</option><option value="درێژ">درێژ</option><option value="خڕ">خڕ</option><option value="کوردی">کوردی</option></select>{% endif %}
-                {% if show_c %}<select class="opt-select" id="cm_{{it.id}}"><option value="">ب. مریشک</option><option value="سینگ">سینگ</option><option value="ڕان">ڕان</option></select>{% endif %}
-            {% endif %}
-            <div class="stp">
+            <div class="stp" style="margin-top:auto;">
                 <button class="s-btn" onclick="addF('{{ it.food_name | replace("'", "\\'") }}',-1,{{it.price}},'{{it.category}}',{{it.id}})">-</button>
                 <span style="font-weight:bold; font-size:14px;" data-name="{{it.food_name}}" class="qty-lbl">0</span>
                 <button class="s-btn add" onclick="addF('{{ it.food_name | replace("'", "\\'") }}',1,{{it.price}},'{{it.category}}',{{it.id}})">+</button>
@@ -1389,10 +1496,66 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
             </div>
         </div>
     </div>
+    
+    <!-- Note Modal -->
+    <div class="modal-note" id="noteModal">
+        <div class="m-box" style="background:var(--card); border:1px solid var(--border); border-radius:16px; max-width: 400px; width:100%; display: flex; flex-direction: column; gap: 15px; padding: 20px; margin:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                <h3 style="color:var(--primary); margin:0; font-size:16px;">✏️ زیادکردنی تێبینی</h3>
+                <span style="color:var(--danger); cursor:pointer; font-weight:bold; font-size:20px;" onclick="closeNoteModal()">✕</span>
+            </div>
+            
+            <div style="display:flex; flex-wrap:wrap; gap:6px;" id="quickNotes">
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی درێژ')">برنجی درێژ</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
+                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
+                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ١')">قاپی ١</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٢')">قاپی ٢</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٣')">قاپی ٣</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٤')">قاپی ٤</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٥')">قاپی ٥</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٦')">قاپی ٦</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٧')">قاپی ٧</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٨')">قاپی ٨</button>
+                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٩')">قاپی ٩</button>
+            </div>
+
+            <!-- Numpad for Fish Weight -->
+            <div id="fishWeightSection" style="display:none; flex-direction:column; gap:10px;">
+                <label style="color:var(--primary); font-size:14px; font-weight:bold; text-align:center;">کێش دیاری بکە (کیلۆگڕام):</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="fishWeightInput" readonly style="flex:1; background:var(--bg); border:1px solid var(--border); color:#fff; padding:12px; border-radius:8px; font-size:20px; text-align:center; font-weight:bold;">
+                    <button class="btn-num" style="background:var(--danger); padding:12px 20px;" onclick="document.getElementById('fishWeightInput').value=''">C</button>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px;">
+                    <button type="button" class="btn-num" onclick="appendNum('1')">1</button>
+                    <button type="button" class="btn-num" onclick="appendNum('2')">2</button>
+                    <button type="button" class="btn-num" onclick="appendNum('3')">3</button>
+                    <button type="button" class="btn-num" onclick="appendNum('4')">4</button>
+                    <button type="button" class="btn-num" onclick="appendNum('5')">5</button>
+                    <button type="button" class="btn-num" onclick="appendNum('6')">6</button>
+                    <button type="button" class="btn-num" onclick="appendNum('7')">7</button>
+                    <button type="button" class="btn-num" onclick="appendNum('8')">8</button>
+                    <button type="button" class="btn-num" onclick="appendNum('9')">9</button>
+                    <button type="button" class="btn-num" onclick="appendNum('.')">.</button>
+                    <button type="button" class="btn-num" onclick="appendNum('0')">0</button>
+                    <button type="button" class="btn-num" onclick="appendNum('00')">00</button>
+                </div>
+            </div>
+
+            <input type="text" id="customNoteInput" class="c-input" placeholder="یان لێرە بە دەست بنووسە..." style="padding:12px; width:100%; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px; font-family:inherit; margin-top:10px;">
+            
+            <button style="background:var(--accent); color:#000; padding:12px; border:none; border-radius:10px; font-weight:bold; font-size:15px; width:100%; cursor:pointer; margin-top:5px;" onclick="saveNote()">تۆمارکردن</button>
+        </div>
+    </div>
     {% endif %}
 
     <script>
         let cart=[], orig=[]; const tbl="{{ table_num }}"; const isW=location.href.includes('/mobile/menu');
+        let editingNoteIdx = -1;
 
         let tempWL = localStorage.getItem('lang') || 'ku';
         function selWLang(l, btn) {
@@ -1423,25 +1586,15 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 
         function fCat(id, btn) {
             document.querySelectorAll('.c-btn').forEach(b=>b.classList.remove('act')); btn.classList.add('act');
-            document.querySelectorAll('.cat-it').forEach(i => i.style.display = (id==='all' || i.classList.contains(id)) ? 'block' : 'none');
+            document.querySelectorAll('.cat-it').forEach(i => { i.style.display = (id==='all' || i.classList.contains(id)) ? 'flex' : 'none'; });
         }
 
         function addF(n, d, p, c, id) {
-            let fn = n, rel = document.getElementById('rm_'+id), cel = document.getElementById('cm_'+id);
-            if(rel && rel.value) fn += ` (${rel.value})`;
-            if(cel && cel.value) fn += ` (${cel.value})`;
-            
+            let fn = n;
             let qtyToAdd = d;
-            let wEl = document.getElementById('w_'+id);
-            if(wEl && wEl.value) {
-                let w = parseFloat(wEl.value);
-                if(!isNaN(w) && w > 0) {
-                    qtyToAdd = d > 0 ? w : -w;
-                }
-            }
-
             let oQ = orig.find(o=>o.ku===fn && !o.is_divider); oQ = oQ?oQ.qty:0;
             let f = false;
+            
             for(let i=cart.length-1; i>=0; i--) {
                 if(cart[i].is_divider) break;
                 if(cart[i].ku === fn) {
@@ -1452,7 +1605,8 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
                     f=true; break;
                 }
             }
-            if(!f && d>0) {
+            
+            if(!f && qtyToAdd > 0) {
                 cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:qtyToAdd, cat:c});
             }
             ren();
@@ -1469,13 +1623,75 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 
         function delI(i) { cart.splice(i, 1); ren(); }
         
-        function edtM(i) { 
-            let n=prompt('تێبینی (بۆ نموونە: بێ پیاز):'); 
-            if(n && n.trim() !== '') {
-                cart[i].ku += ` (${n.trim()})`;
-                cart[i].full_name = cart[i].ku; 
+        function appendNum(val) {
+            let inp = document.getElementById('fishWeightInput');
+            if (val === '.' && inp.value.includes('.')) return;
+            inp.value += val;
+        }
+
+        function editNote(idx) {
+            editingNoteIdx = idx;
+            document.getElementById('customNoteInput').value = '';
+            
+            let cat = cart[idx].cat || '';
+            let n = cart[idx].ku || '';
+            let isGrill = cat.includes('برژاو') || n.includes('کەباب') || n.includes('تکە');
+            let isPoultry = cat.includes('پەلەوەر') || n.includes('مریشک');
+            let isBoiled = cat.includes('کوڵاو') || cat.includes('کورد') || cat.includes('شۆربا');
+            let isFish = cat.includes('ماسی') || n.includes('ماسی');
+
+            if (isFish) {
+                document.getElementById('quickNotes').style.display = 'none';
+                document.getElementById('fishWeightSection').style.display = 'flex';
+                document.getElementById('fishWeightInput').value = cart[idx].qty;
+            } else {
+                document.getElementById('fishWeightSection').style.display = 'none';
+                document.getElementById('quickNotes').style.display = 'flex';
+                document.querySelectorAll('#quickNotes .btn-quick-note').forEach(b => {
+                    b.style.display = 'none';
+                    if (isGrill && b.classList.contains('qn-grill')) b.style.display = '';
+                    if (isPoultry && (b.classList.contains('qn-rice') || b.classList.contains('qn-chicken'))) b.style.display = '';
+                    if (isBoiled && !isPoultry && b.classList.contains('qn-rice')) b.style.display = '';
+                    if (!isGrill && !isPoultry && !isBoiled && !isFish) b.style.display = '';
+                });
+            }
+            
+            document.getElementById('noteModal').style.display = 'flex';
+        }
+        
+        function closeNoteModal() {
+            document.getElementById('noteModal').style.display = 'none';
+            editingNoteIdx = -1;
+        }
+        
+        function addNoteText(txt) {
+            let inp = document.getElementById('customNoteInput');
+            inp.value = inp.value ? inp.value + ' - ' + txt : txt;
+        }
+        
+        function saveNote() {
+            if (editingNoteIdx > -1) {
+                let note = document.getElementById('customNoteInput').value;
+                if (note && note.trim() !== '') {
+                    cart[editingNoteIdx].ku += ' (' + note.trim() + ')';
+                    cart[editingNoteIdx].full_name = cart[editingNoteIdx].ku;
+                }
+                
+                if (document.getElementById('fishWeightSection').style.display !== 'none') {
+                    let w = parseFloat(document.getElementById('fishWeightInput').value);
+                    if (!isNaN(w) && w > 0) {
+                        let oQ = orig.find(o=>o.ku===cart[editingNoteIdx].ku && !o.is_divider); 
+                        oQ = oQ ? oQ.qty : 0;
+                        if (!isW && w < oQ) {
+                            alert("ناتوانیت داواکاری پێشوو کەم بکەیتەوە!");
+                        } else {
+                            cart[editingNoteIdx].qty = w;
+                        }
+                    }
+                }
                 ren();
-            } 
+            }
+            closeNoteModal();
         }
 
         function addDivM() { 
@@ -1499,7 +1715,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
                         <div style="display:flex; align-items:center; gap:6px;">
                             <span style="color:var(--accent); font-size:12px; font-weight:bold;">${(it.price*it.qty).toLocaleString()}</span>
                             <button class="s-btn" style="background:#ef4444; font-size:12px;" onclick="delI(${i})">🗑</button>
-                            <button class="s-btn" style="background:#3b82f6; font-size:12px;" onclick="edtM(${i})">✏️</button>
+                            <button class="s-btn" style="background:#3b82f6; font-size:12px;" onclick="editNote(${i})">✏</button>
                             <button class="s-btn" onclick="updQ(${i},-1)">-</button>
                             <span style="width:30px; text-align:center; font-weight:bold; background:rgba(255,255,255,0.1); border-radius:4px; padding:2px;">${parseFloat(it.qty.toFixed(3))}</span>
                             <button class="s-btn add" onclick="updQ(${i},1)">+</button>
@@ -1659,7 +1875,7 @@ def admin_amar():
                 total_expenses = float(cur.fetchone()['e'])
             except: pass
             try:
-                cur.execute("SELECT IFNULL(SUM((CASE WHEN wa.status = 'هاتوو' THEN w.salary ELSE 0 END) + IFNULL(wa.bonus, 0)), 0) AS w_due FROM workers w INNER JOIN worker_attendance wa ON w.id = wa.worker_id WHERE wa.date >= %s AND wa.date <= %s", (start_date, end_date))
+                cur.execute("SELECT IFNULL(SUM((CASE WHEN wa.status = 'هاتوو' THEN w.salary WHEN wa.status = 'نیوو شەفت' THEN w.salary / 2 ELSE 0 END) + IFNULL(wa.bonus, 0)), 0) AS w_due FROM workers w INNER JOIN worker_attendance wa ON w.id = wa.worker_id WHERE wa.date >= %s AND wa.date <= %s", (start_date, end_date))
                 total_workers_wage = float(cur.fetchone()['w_due'])
             except: pass
     except: pass
@@ -1731,7 +1947,15 @@ def admin_workers():
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT w.id, w.name, w.phone, w.salary, COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) AS work_days, (COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) * w.salary) AS total_salary, IFNULL(SUM(wa.bonus), 0) AS total_bonus, ((COUNT(CASE WHEN wa.status = 'هاتوو' THEN 1 END) * w.salary) + IFNULL(SUM(wa.bonus), 0)) AS total_due FROM workers w LEFT JOIN worker_attendance wa ON w.id = wa.worker_id AND wa.date >= %s AND wa.date <= %s GROUP BY w.id ORDER BY w.id DESC", (start_date, end_date))
+            cur.execute("""
+                SELECT w.id, w.name, w.phone, w.salary, 
+                IFNULL(SUM(CASE WHEN wa.status = 'هاتوو' THEN 1 WHEN wa.status = 'نیوو شەفت' THEN 0.5 ELSE 0 END), 0) AS work_days, 
+                (IFNULL(SUM(CASE WHEN wa.status = 'هاتوو' THEN 1 WHEN wa.status = 'نیوو شەفت' THEN 0.5 ELSE 0 END), 0) * w.salary) AS total_salary, 
+                IFNULL(SUM(wa.bonus), 0) AS total_bonus, 
+                ((IFNULL(SUM(CASE WHEN wa.status = 'هاتوو' THEN 1 WHEN wa.status = 'نیوو شەفت' THEN 0.5 ELSE 0 END), 0) * w.salary) + IFNULL(SUM(wa.bonus), 0)) AS total_due 
+                FROM workers w LEFT JOIN worker_attendance wa ON w.id = wa.worker_id AND wa.date >= %s AND wa.date <= %s 
+                GROUP BY w.id ORDER BY w.id DESC
+            """, (start_date, end_date))
             rows = cur.fetchall()
             cur.execute("SELECT id, name, salary FROM workers ORDER BY id ASC")
             for w in cur.fetchall():
@@ -1920,9 +2144,8 @@ def admin_add_food():
     if 'food_image' in request.files:
         f = request.files['food_image']
         if f.filename != '':
-            fn = secure_filename(f"{int(datetime.now().timestamp())}_{f.filename}")
-            f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
-            img = url_for('static', filename=f'uploads/{fn}')
+            img_b64 = base64.b64encode(f.read()).decode('utf-8')
+            img = f"data:{f.mimetype};base64,{img_b64}"
             
     conn = get_db()
     try:
@@ -1944,9 +2167,8 @@ def admin_edit_food(fid):
     final_img = None
     if 'food_image' in request.files and request.files['food_image'].filename != '':
         f = request.files['food_image']
-        fn = secure_filename(f"{int(datetime.now().timestamp())}_{f.filename}")
-        f.save(os.path.join(app.config['UPLOAD_FOLDER'], fn))
-        final_img = url_for('static', filename=f'uploads/{fn}')
+        img_b64 = base64.b64encode(f.read()).decode('utf-8')
+        final_img = f"data:{f.mimetype};base64,{img_b64}"
     elif img_link != '':
         final_img = img_link
 

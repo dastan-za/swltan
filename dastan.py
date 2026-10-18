@@ -206,7 +206,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
         </div>
     </div>
     <div class="login-card">
-        <div class="brand-title" id="t_title">✨ چێشتماڵە</div>
+        <div class="brand-title" id="t_title">✨ دیوانی سوڵتان</div>
         <div class="brand-sub" id="t_sub">تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە</div>
         <form method="POST" action="/login">
             <div class="input-group"><label id="t_lbl_u">ناوی بەکارهێنەر</label><input type="text" name="username" class="login-input" autofocus></div>
@@ -217,7 +217,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
     </div>
     <script>
         const langDictL = {
-            'ku': { 'title': '✨ چێشتماڵە', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
+            'ku': { 'title': '✨ دیوانی سوڵتان', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
             'ar': { 'title': '✨ جيشتمالة', 'sub': 'يرجى إدخال اسم المستخدم وكلمة المرور', 'lbl_u': 'اسم المستخدم', 'lbl_p': 'كلمة المرور', 'btn': 'تسجيل الدخول ➔' },
             'en': { 'title': '✨ Cheshtmala', 'sub': 'Please enter your username and password', 'lbl_u': 'Username', 'lbl_p': 'Password', 'btn': 'Login ➔' }
         };
@@ -296,7 +296,7 @@ ADMIN_DASHBOARD_TEMPLATE = COMMON_HEAD + """
 </head>
 <body>
     <header class="admin-nav">
-        <div class="admin-brand" data-tr="dashboard">✨ چێشتماڵە - داشبۆرد</div>
+        <div class="admin-brand" data-tr="dashboard">✨ دیوانی سوڵتان - داشبۆرد</div>
         <div style="display: flex; align-items: center; gap: 16px;">
             <span style="color:#cbd5e1; font-size:13px; font-weight:700;">👑 {{ session.get('full_name', 'بەڕێوەبەر') }}</span>
             <a href="/logout" class="btn-exit" data-tr="logout">✕ دەرچوون</a>
@@ -785,7 +785,7 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
         function printR(d) {
             let win = window.open('','_blank','width=400,height=600');
             let h = `<!DOCTYPE html><html dir="rtl"><head><style>body{font-family:sans-serif; width:72mm; margin:0 auto; padding:4mm; font-size:12px; text-align:center;} .line{border-top:1px dashed #000; margin:5px 0;} th,td{text-align:center; padding:2px;} .r{text-align:right;}</style></head><body>
-            <h3>چێشتماڵە</h3><div>مێزی: ${d.table}</div><div class="line"></div>
+            <h3>دیوانی سوڵتان</h3><div>مێزی: ${d.table}</div><div class="line"></div>
             <table style="width:100%"><tr><th class="r">خواردن</th><th>بڕ</th><th>کۆ</th></tr>`;
             d.items.forEach(it => { h += `<tr><td class="r">${it.food_name||it[0]}</td><td>${parseFloat(it.quantity||it[1])}</td><td>${(it.price||it[2])*parseFloat(it.quantity||it[1])}</td></tr>`; });
             h += `</table><div class="line"></div><div style="text-align:right">کۆی گشتی: ${d.total}</div><div style="text-align:right">وەرگیراو: ${d.paid}</div>
@@ -1139,6 +1139,9 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی درێژ')">برنجی درێژ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی سرکە')">برنجی سرکە</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('قەرە خەرمان')">قەرەخەرمان</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ+درێژ')">برنجی خڕ+درێژ</button
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
@@ -1418,7 +1421,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 </head>
 <body>
     <div id="welcomeOverlay" style="position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
-        <h1 style="color:var(--primary); margin-bottom:10px;">✨ چێشتماڵە</h1>
+        <h1 style="color:var(--primary); margin-bottom:10px;">✨ دیوانی سوڵتان</h1>
         <h3 style="color:var(--text); margin-bottom:30px; font-size:16px;">بەخێربێیت بۆ مێزی {{ table_num }}</h3>
         
         <p style="color:var(--text); margin-bottom:15px; font-size:14px;">تکایە زمانێک هەڵبژێرە / Select Language</p>
@@ -1433,7 +1436,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 
     <div id="toast">✅ نێردرا</div>
     <div class="hdr">
-        <span style="font-weight:bold; color:var(--primary);">چێشتماڵە</span>
+        <span style="font-weight:bold; color:var(--primary);">دیوانی سوڵتان</span>
         <span class="pill">{{ table_num }}</span>
     </div>
     {% if not allow_ordering %}

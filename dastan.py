@@ -782,45 +782,60 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
             fetch('/admin/complete_payment', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:curTable, amount_paid:p, total_amount:tot})})
             .then(r=>r.json()).then(res=>{ if(res.status==='success'){ printR(res.receipt); } else alert(res.message); });
         }
-       function printR(d) {
+      function printR(d) {
             let win = window.open('','_blank','width=400,height=600');
             let h = `<!DOCTYPE html><html dir="rtl"><head>
             <meta charset="utf-8">
-            <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700;800&display=swap" rel="stylesheet">
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
                 @page { 
-                    margin: 0; /* ئەمە وا دەکات هیچ بۆشاییەک و لینکێکی زیادە نەچێتە سەر کاغەزەکە */
+                    margin: 0; 
                 }
                 body {
                     font-family: 'Noto Kufi Arabic', sans-serif; 
-                    width: 78mm; /* پانی کاغەزی حەراری ٨٠ ملم */
-                    margin: 0; 
-                    padding: 4mm; 
-                    font-size: 9px; 
+                    width: 72mm; /* کەمکرایەوە بۆ ٧٢ ملم تا ژمارەکان نەبڕدرێن */
+                    margin: 0 auto; 
+                    padding: 3mm; 
+                    font-size: 10px; /* فۆنتەکە بچووک کرایەوە */
                     color: #000;
                     box-sizing: border-box;
                 }
-                .t { text-align: center; font-size: 18px; font-weight: 800; margin-bottom: 2px; }
-                .s { text-align: center; font-size: 12px; margin-bottom: 5px; font-weight: 700; }
-                .line { border-top: 1px dashed #000; margin: 6px 0; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
-                th, td { padding: 4px 0; }
-                th { border-bottom: 1px solid #000; font-size: 11px; font-weight: 800; }
-                td { font-weight: 700; }
-                .r { text-align: right; } .c { text-align: center; } .l { text-align: left; }
-                .tot { display: flex; justify-content: space-between; font-weight: 800; font-size: 14px; margin-top: 4px; }
-                .ft { text-align: center; font-weight: 800; font-size: 14px; margin-top: 10px; margin-bottom: 0; padding-bottom: 0; }
+                .t { text-align: center; font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+                .s { text-align: center; font-size: 11px; margin-bottom: 4px; font-weight: 600; }
+                .line { border-top: 1px dashed #000; margin: 4px 0; }
+                
+                table { width: 100%; border-collapse: collapse; margin-bottom: 5px; table-layout: fixed; }
+                th, td { padding: 3px 1px; }
+                th { border-bottom: 1px solid #000; font-size: 10px; font-weight: 700; }
+                td { font-size: 10px; font-weight: 600; vertical-align: top; }
+                
+                /* ڕێکخستنی پانی کۆڵۆمەکان بۆ ئەوەی جێگەی ژمارەکان فراوان بێت و نەبڕدرێن */
+                .col-name { width: 50%; text-align: right; word-wrap: break-word; }
+                .col-qty { width: 15%; text-align: center; }
+                .col-tot { width: 35%; text-align: left; }
+                
+                .tot { display: flex; justify-content: space-between; font-weight: 700; font-size: 12px; margin-top: 3px; }
+                .ft { text-align: center; font-weight: 700; font-size: 12px; margin-top: 8px; margin-bottom: 0; }
             </style>
             </head><body>
             <div class="t">چێشتماڵە</div>
             <div class="s">مێزی: ${d.table}</div>
             <div class="line"></div>
-            <table><tr><th class="r">خواردن</th><th class="c">بڕ</th><th class="l">کۆ</th></tr>`;
+            <table>
+                <tr>
+                    <th class="col-name">خواردن</th>
+                    <th class="col-qty">بڕ</th>
+                    <th class="col-tot">کۆ</th>
+                </tr>`;
             
             d.items.forEach(it => { 
                 let qty = parseFloat(it.quantity||it[1]);
                 let price = parseFloat(it.price||it[2]);
-                h += `<tr><td class="r">${it.food_name||it[0]}</td><td class="c">${qty}</td><td class="l">${(price*qty).toLocaleString()}</td></tr>`; 
+                h += `<tr>
+                        <td class="col-name">${it.food_name||it[0]}</td>
+                        <td class="col-qty">${qty}</td>
+                        <td class="col-tot">${(price*qty).toLocaleString()}</td>
+                      </tr>`; 
             });
             
             h += `</table><div class="line"></div>
@@ -829,11 +844,10 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
             <div class="line"></div><div class="ft">سوپاس بۆ سەردانیتان</div>
             <script>
                 window.onload = function() {
-                    // کەمێک چاوەڕێ دەکات تا فۆنتە کوفییەکە بە تەواوی لۆد دەبێت پاشان پرێنت دەکات
                     setTimeout(function(){
                         window.print();
                         setTimeout(function(){ window.close(); }, 500);
-                    }, 800);
+                    }, 500);
                 };
             <\/script></body></html>`;
             

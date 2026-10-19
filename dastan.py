@@ -24,7 +24,7 @@ DB_CONFIG = {
     'port': 31707,
     'user': 'root',
     'password': 'HITVDFaMFehpQFmWrZlnaTKtavNtBZyw',
-    'database': 'railway',
+    'database': 'nrx',
     'charset': 'utf8mb4',
     'connect_timeout': 10,
     'cursorclass': pymysql.cursors.DictCursor
@@ -784,20 +784,38 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
         }
         function printR(d) {
             let win = window.open('','_blank','width=400,height=600');
-            let h = `<!DOCTYPE html><html dir="rtl"><head><style>body{font-family:sans-serif; width:72mm; margin:0 auto; padding:4mm; font-size:12px; text-align:center;} .line{border-top:1px dashed #000; margin:5px 0;} th,td{text-align:center; padding:2px;} .r{text-align:right;}</style></head><body>
-            <h3>چێشتماڵە</h3><div>مێزی: ${d.table}</div><div class="line"></div>
-            <table style="width:100%"><tr><th class="r">خواردن</th><th>بڕ</th><th>کۆ</th></tr>`;
-            d.items.forEach(it => { h += `<tr><td class="r">${it.food_name||it[0]}</td><td>${parseFloat(it.quantity||it[1])}</td><td>${(it.price||it[2])*parseFloat(it.quantity||it[1])}</td></tr>`; });
-            h += `</table><div class="line"></div><div style="text-align:right">کۆی گشتی: ${d.total}</div><div style="text-align:right">وەرگیراو: ${d.paid}</div>
-            <div class="line"></div><div>سوپاس!</div><script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}<\\/script></body></html>`;
+            let h = `<!DOCTYPE html><html dir="rtl"><head><style>
+            body{font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; width:72mm; margin:0 auto; padding:2mm 4mm; font-size:12px; color:#000;}
+            .t{text-align:center; font-size:18px; font-weight:bold; margin-bottom:2px;}
+            .s{text-align:center; font-size:12px; margin-bottom:5px;}
+            .line{border-top:1px dashed #000; margin:6px 0;}
+            table{width:100%; border-collapse:collapse; margin-bottom:5px;}
+            th,td{padding:4px 0;}
+            th{border-bottom:1px solid #000; font-size:11px;}
+            .r{text-align:right;} .c{text-align:center;} .l{text-align:left;}
+            .tot{display:flex; justify-content:space-between; font-weight:bold; font-size:14px; margin-top:4px;}
+            .ft{text-align:center; font-weight:bold; font-size:14px; margin-top:10px;}
+            </style></head><body>
+            <div class="t">چێشتماڵە</div>
+            <div class="s">مێزی: ${d.table}</div>
+            <div class="line"></div>
+            <table><tr><th class="r">خواردن</th><th class="c">بڕ</th><th class="l">کۆ</th></tr>`;
+            d.items.forEach(it => { 
+                let qty = parseFloat(it.quantity||it[1]);
+                let price = parseFloat(it.price||it[2]);
+                h += `<tr><td class="r">${it.food_name||it[0]}</td><td class="c">${qty}</td><td class="l">${(price*qty).toLocaleString()}</td></tr>`; 
+            });
+            h += `</table><div class="line"></div>
+            <div class="tot"><span>کۆی گشتی:</span><span>${Number(d.total).toLocaleString()}</span></div>
+            <div class="tot"><span>وەرگیراو:</span><span>${Number(d.paid).toLocaleString()}</span></div>
+            <div class="line"></div><div class="ft">سوپاس بۆ سەردانیتان</div>
+            <script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}<\\/script></body></html>`;
             win.document.write(h); win.document.close();
             document.getElementById('chModal').style.display='none'; setTimeout(()=>location.reload(), 1000);
         }
 
-        // نوێبوونەوەی ئۆتۆماتیکی کاشێر هەر ٤ چرکە جارێک
         setInterval(() => {
             let modal = document.getElementById('chModal');
-            // تەنها ئەگەر پەنجەرەی واصڵکردنەکە کراوە نەبوو با ڕیفڕێش بێت تا ئیشی کاشێر تێک نەچێت
             if (!modal || modal.style.display !== 'flex') {
                 fetch('/admin/cashier')
                 .then(r => r.text())
@@ -1080,9 +1098,6 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         .f-img { width: 100%; height: 120px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; flex-shrink: 0; }
         .f-name { font-size: 13px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
         .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 10px; pointer-events: none; }
-        .f-controls { margin-top: auto; display: flex; flex-direction: column; gap: 6px; width: 100%; }
-        
-        .opt-select { flex: 1 1 45%; min-width: 0; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 5px; font-size: 11px; outline: none; text-align: center; }
         
         #toastMsg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 1000; display: none; }
 
@@ -1159,9 +1174,14 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی درێژ')">برنجی درێژ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنج بە سرکە')">برنج بە سرکە</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('روبەهەنار')">روبەهەنار</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('قەرەخەرمان')">قەرەخەرمان</button>
+                
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
+                
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ١')">قاپی ١</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٢')">قاپی ٢</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٣')">قاپی ٣</button>
@@ -1288,17 +1308,14 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
             
             document.getElementById('noteModal').style.display = 'flex';
         }
-        
         function closeNoteModal() {
             document.getElementById('noteModal').style.display = 'none';
             editingNoteIdx = -1;
         }
-        
         function addNoteText(txt) {
             let inp = document.getElementById('customNoteInput');
             inp.value = inp.value ? inp.value + ' - ' + txt : txt;
         }
-        
         function saveNote() {
             if (editingNoteIdx > -1) {
                 let note = document.getElementById('customNoteInput').value;
@@ -1526,9 +1543,14 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی درێژ')">برنجی درێژ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنج بە سرکە')">برنج بە سرکە</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('روبەهەنار')">روبەهەنار</button>
+                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('قەرەخەرمان')">قەرەخەرمان</button>
+                
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
+                
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ١')">قاپی ١</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٢')">قاپی ٢</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٣')">قاپی ٣</button>

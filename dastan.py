@@ -1513,7 +1513,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
-                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
+                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ١')">قاپی ١</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٢')">قاپی ٢</button>
@@ -2097,13 +2097,17 @@ def admin_complete_payment():
             cur.execute("SELECT food_name, quantity, price FROM froshtn WHERE table_cabin = %s", (t_num,))
             items = cur.fetchall()
             p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
-            cur.execute("INSERT INTO qasa (place_id, amount, discount) VALUES (%s, %s, %s)", (p_id, paid, disc))
+            
+            # لێرەدا کاتی ئێستامان زیاد کردووە بە شێوازی داواکراوی داتابەیسەکە
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%i:%s')
+            
+            # کاتەکەمان نارد بۆ ناو داتابەیس
+            cur.execute("INSERT INTO qasa (transaction_time, place_id, amount, discount) VALUES (%s, %s, %s, %s)", (current_time, p_id, paid, disc))
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s OR table_cabin LIKE %s", (t_num, f"{t_num} [%"))
         conn.commit()
         return jsonify({'status': 'success', 'receipt': {'table': t_num, 'items': items, 'total': tot, 'paid': paid}})
     except Exception as e: return jsonify({'status': 'error', 'message': str(e)})
     finally: conn.close()
-
 @app.route('/admin/qasa')
 def admin_qasa():
     if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))

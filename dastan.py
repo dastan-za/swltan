@@ -24,7 +24,7 @@ DB_CONFIG = {
     'port': 31707,
     'user': 'root',
     'password': 'HITVDFaMFehpQFmWrZlnaTKtavNtBZyw',
-    'database': 'nrx',
+    'database': 'railway',
     'charset': 'utf8mb4',
     'connect_timeout': 10,
     'cursorclass': pymysql.cursors.DictCursor
@@ -206,7 +206,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
         </div>
     </div>
     <div class="login-card">
-        <div class="brand-title" id="t_title">✨ دیوانی سوڵتان</div>
+        <div class="brand-title" id="t_title">✨ چێشتماڵە</div>
         <div class="brand-sub" id="t_sub">تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە</div>
         <form method="POST" action="/login">
             <div class="input-group"><label id="t_lbl_u">ناوی بەکارهێنەر</label><input type="text" name="username" class="login-input" autofocus></div>
@@ -217,7 +217,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
     </div>
     <script>
         const langDictL = {
-            'ku': { 'title': '✨ دیوانی سوڵتان', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
+            'ku': { 'title': '✨ چێشتماڵە', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
             'ar': { 'title': '✨ جيشتمالة', 'sub': 'يرجى إدخال اسم المستخدم وكلمة المرور', 'lbl_u': 'اسم المستخدم', 'lbl_p': 'كلمة المرور', 'btn': 'تسجيل الدخول ➔' },
             'en': { 'title': '✨ Cheshtmala', 'sub': 'Please enter your username and password', 'lbl_u': 'Username', 'lbl_p': 'Password', 'btn': 'Login ➔' }
         };
@@ -296,7 +296,7 @@ ADMIN_DASHBOARD_TEMPLATE = COMMON_HEAD + """
 </head>
 <body>
     <header class="admin-nav">
-        <div class="admin-brand" data-tr="dashboard">✨ دیوانی سوڵتان - داشبۆرد</div>
+        <div class="admin-brand" data-tr="dashboard">✨ چێشتماڵە - داشبۆرد</div>
         <div style="display: flex; align-items: center; gap: 16px;">
             <span style="color:#cbd5e1; font-size:13px; font-weight:700;">👑 {{ session.get('full_name', 'بەڕێوەبەر') }}</span>
             <a href="/logout" class="btn-exit" data-tr="logout">✕ دەرچوون</a>
@@ -785,7 +785,7 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
         function printR(d) {
             let win = window.open('','_blank','width=400,height=600');
             let h = `<!DOCTYPE html><html dir="rtl"><head><style>body{font-family:sans-serif; width:72mm; margin:0 auto; padding:4mm; font-size:12px; text-align:center;} .line{border-top:1px dashed #000; margin:5px 0;} th,td{text-align:center; padding:2px;} .r{text-align:right;}</style></head><body>
-            <h3>دیوانی سوڵتان</h3><div>مێزی: ${d.table}</div><div class="line"></div>
+            <h3>چێشتماڵە</h3><div>مێزی: ${d.table}</div><div class="line"></div>
             <table style="width:100%"><tr><th class="r">خواردن</th><th>بڕ</th><th>کۆ</th></tr>`;
             d.items.forEach(it => { h += `<tr><td class="r">${it.food_name||it[0]}</td><td>${parseFloat(it.quantity||it[1])}</td><td>${(it.price||it[2])*parseFloat(it.quantity||it[1])}</td></tr>`; });
             h += `</table><div class="line"></div><div style="text-align:right">کۆی گشتی: ${d.total}</div><div style="text-align:right">وەرگیراو: ${d.paid}</div>
@@ -793,6 +793,23 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
             win.document.write(h); win.document.close();
             document.getElementById('chModal').style.display='none'; setTimeout(()=>location.reload(), 1000);
         }
+
+        // نوێبوونەوەی ئۆتۆماتیکی کاشێر هەر ٤ چرکە جارێک
+        setInterval(() => {
+            let modal = document.getElementById('chModal');
+            // تەنها ئەگەر پەنجەرەی واصڵکردنەکە کراوە نەبوو با ڕیفڕێش بێت تا ئیشی کاشێر تێک نەچێت
+            if (!modal || modal.style.display !== 'flex') {
+                fetch('/admin/cashier')
+                .then(r => r.text())
+                .then(html => {
+                    let doc = new DOMParser().parseFromString(html, 'text/html');
+                    let newGrid = doc.getElementById('tablesGrid');
+                    if (newGrid) {
+                        document.getElementById('tablesGrid').innerHTML = newGrid.innerHTML;
+                    }
+                }).catch(e => console.log('Error refreshing tables:', e));
+            }
+        }, 4000);
     </script>
 </body>
 </html>
@@ -1063,6 +1080,9 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         .f-img { width: 100%; height: 120px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; flex-shrink: 0; }
         .f-name { font-size: 13px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
         .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 10px; pointer-events: none; }
+        .f-controls { margin-top: auto; display: flex; flex-direction: column; gap: 6px; width: 100%; }
+        
+        .opt-select { flex: 1 1 45%; min-width: 0; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 5px; font-size: 11px; outline: none; text-align: center; }
         
         #toastMsg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 1000; display: none; }
 
@@ -1139,9 +1159,6 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی درێژ')">برنجی درێژ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی سرکە')">برنجی سرکە</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('قەرە خەرمان')">قەرەخەرمان</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ+درێژ')">برنجی خڕ+درێژ</button
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
@@ -1217,14 +1234,11 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
 
         function addF(n, p, c, id) {
             let fn = n;
-            let isFish = c.includes('ماسی') || n.includes('ماسی');
             let fd = false;
             
-            if(!isFish) {
-                for(let i=cart.length-1; i>=0; i--) {
-                    if(cart[i].is_divider) break;
-                    if(cart[i].ku === fn) { cart[i].qty += 1; fd=true; break; }
-                }
+            for(let i=cart.length-1; i>=0; i--) {
+                if(cart[i].is_divider) break;
+                if(cart[i].ku === fn) { cart[i].qty += 1; fd=true; break; }
             }
             if(!fd) cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:1, cat:c});
             ren();
@@ -1421,7 +1435,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 </head>
 <body>
     <div id="welcomeOverlay" style="position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
-        <h1 style="color:var(--primary); margin-bottom:10px;">✨ دیوانی سوڵتان</h1>
+        <h1 style="color:var(--primary); margin-bottom:10px;">✨ چێشتماڵە</h1>
         <h3 style="color:var(--text); margin-bottom:30px; font-size:16px;">بەخێربێیت بۆ مێزی {{ table_num }}</h3>
         
         <p style="color:var(--text); margin-bottom:15px; font-size:14px;">تکایە زمانێک هەڵبژێرە / Select Language</p>
@@ -1436,7 +1450,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 
     <div id="toast">✅ نێردرا</div>
     <div class="hdr">
-        <span style="font-weight:bold; color:var(--primary);">دیوانی سوڵتان</span>
+        <span style="font-weight:bold; color:var(--primary);">چێشتماڵە</span>
         <span class="pill">{{ table_num }}</span>
     </div>
     {% if not allow_ordering %}
@@ -1513,7 +1527,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
                 <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
-                 <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
+                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ١')">قاپی ١</button>
                 <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٢')">قاپی ٢</button>
@@ -2097,17 +2111,14 @@ def admin_complete_payment():
             cur.execute("SELECT food_name, quantity, price FROM froshtn WHERE table_cabin = %s", (t_num,))
             items = cur.fetchall()
             p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
-            
-            # لێرەدا کاتی ئێستامان زیاد کردووە بە شێوازی داواکراوی داتابەیسەکە
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%i:%s')
-            
-            # کاتەکەمان نارد بۆ ناو داتابەیس
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cur.execute("INSERT INTO qasa (transaction_time, place_id, amount, discount) VALUES (%s, %s, %s, %s)", (current_time, p_id, paid, disc))
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s OR table_cabin LIKE %s", (t_num, f"{t_num} [%"))
         conn.commit()
         return jsonify({'status': 'success', 'receipt': {'table': t_num, 'items': items, 'total': tot, 'paid': paid}})
     except Exception as e: return jsonify({'status': 'error', 'message': str(e)})
     finally: conn.close()
+
 @app.route('/admin/qasa')
 def admin_qasa():
     if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))

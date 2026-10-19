@@ -796,7 +796,7 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
                     width: 78mm; /* پانی کاغەزی حەراری ٨٠ ملم */
                     margin: 0; 
                     padding: 4mm; 
-                    font-size: 12px; 
+                    font-size: 9px; 
                     color: #000;
                     box-sizing: border-box;
                 }

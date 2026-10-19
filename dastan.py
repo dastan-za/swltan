@@ -782,38 +782,66 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
             fetch('/admin/complete_payment', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:curTable, amount_paid:p, total_amount:tot})})
             .then(r=>r.json()).then(res=>{ if(res.status==='success'){ printR(res.receipt); } else alert(res.message); });
         }
-        function printR(d) {
+       function printR(d) {
             let win = window.open('','_blank','width=400,height=600');
-            let h = `<!DOCTYPE html><html dir="rtl"><head><style>
-            body{font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; width:72mm; margin:0 auto; padding:2mm 4mm; font-size:12px; color:#000;}
-            .t{text-align:center; font-size:18px; font-weight:bold; margin-bottom:2px;}
-            .s{text-align:center; font-size:12px; margin-bottom:5px;}
-            .line{border-top:1px dashed #000; margin:6px 0;}
-            table{width:100%; border-collapse:collapse; margin-bottom:5px;}
-            th,td{padding:4px 0;}
-            th{border-bottom:1px solid #000; font-size:11px;}
-            .r{text-align:right;} .c{text-align:center;} .l{text-align:left;}
-            .tot{display:flex; justify-content:space-between; font-weight:bold; font-size:14px; margin-top:4px;}
-            .ft{text-align:center; font-weight:bold; font-size:14px; margin-top:10px;}
-            </style></head><body>
+            let h = `<!DOCTYPE html><html dir="rtl"><head>
+            <meta charset="utf-8">
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700;800&display=swap" rel="stylesheet">
+            <style>
+                @page { 
+                    margin: 0; /* ئەمە وا دەکات هیچ بۆشاییەک و لینکێکی زیادە نەچێتە سەر کاغەزەکە */
+                }
+                body {
+                    font-family: 'Noto Kufi Arabic', sans-serif; 
+                    width: 78mm; /* پانی کاغەزی حەراری ٨٠ ملم */
+                    margin: 0; 
+                    padding: 4mm; 
+                    font-size: 12px; 
+                    color: #000;
+                    box-sizing: border-box;
+                }
+                .t { text-align: center; font-size: 18px; font-weight: 800; margin-bottom: 2px; }
+                .s { text-align: center; font-size: 12px; margin-bottom: 5px; font-weight: 700; }
+                .line { border-top: 1px dashed #000; margin: 6px 0; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+                th, td { padding: 4px 0; }
+                th { border-bottom: 1px solid #000; font-size: 11px; font-weight: 800; }
+                td { font-weight: 700; }
+                .r { text-align: right; } .c { text-align: center; } .l { text-align: left; }
+                .tot { display: flex; justify-content: space-between; font-weight: 800; font-size: 14px; margin-top: 4px; }
+                .ft { text-align: center; font-weight: 800; font-size: 14px; margin-top: 10px; margin-bottom: 0; padding-bottom: 0; }
+            </style>
+            </head><body>
             <div class="t">چێشتماڵە</div>
             <div class="s">مێزی: ${d.table}</div>
             <div class="line"></div>
             <table><tr><th class="r">خواردن</th><th class="c">بڕ</th><th class="l">کۆ</th></tr>`;
+            
             d.items.forEach(it => { 
                 let qty = parseFloat(it.quantity||it[1]);
                 let price = parseFloat(it.price||it[2]);
                 h += `<tr><td class="r">${it.food_name||it[0]}</td><td class="c">${qty}</td><td class="l">${(price*qty).toLocaleString()}</td></tr>`; 
             });
+            
             h += `</table><div class="line"></div>
             <div class="tot"><span>کۆی گشتی:</span><span>${Number(d.total).toLocaleString()}</span></div>
             <div class="tot"><span>وەرگیراو:</span><span>${Number(d.paid).toLocaleString()}</span></div>
             <div class="line"></div><div class="ft">سوپاس بۆ سەردانیتان</div>
-            <script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}<\\/script></body></html>`;
-            win.document.write(h); win.document.close();
-            document.getElementById('chModal').style.display='none'; setTimeout(()=>location.reload(), 1000);
+            <script>
+                window.onload = function() {
+                    // کەمێک چاوەڕێ دەکات تا فۆنتە کوفییەکە بە تەواوی لۆد دەبێت پاشان پرێنت دەکات
+                    setTimeout(function(){
+                        window.print();
+                        setTimeout(function(){ window.close(); }, 500);
+                    }, 800);
+                };
+            <\/script></body></html>`;
+            
+            win.document.write(h); 
+            win.document.close();
+            document.getElementById('chModal').style.display='none'; 
+            setTimeout(()=>location.reload(), 1000);
         }
-
         setInterval(() => {
             let modal = document.getElementById('chModal');
             if (!modal || modal.style.display !== 'flex') {

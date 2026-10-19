@@ -206,7 +206,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
         </div>
     </div>
     <div class="login-card">
-        <div class="brand-title" id="t_title">✨ چێشتماڵە</div>
+        <div class="brand-title" id="t_title">✨ دیوانی سوڵتان</div>
         <div class="brand-sub" id="t_sub">تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە</div>
         <form method="POST" action="/login">
             <div class="input-group"><label id="t_lbl_u">ناوی بەکارهێنەر</label><input type="text" name="username" class="login-input" autofocus></div>
@@ -217,7 +217,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
     </div>
     <script>
         const langDictL = {
-            'ku': { 'title': '✨ چێشتماڵە', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
+            'ku': { 'title': '✨ دیوانی سوڵتان', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
             'ar': { 'title': '✨ جيشتمالة', 'sub': 'يرجى إدخال اسم المستخدم وكلمة المرور', 'lbl_u': 'اسم المستخدم', 'lbl_p': 'كلمة المرور', 'btn': 'تسجيل الدخول ➔' },
             'en': { 'title': '✨ Cheshtmala', 'sub': 'Please enter your username and password', 'lbl_u': 'Username', 'lbl_p': 'Password', 'btn': 'Login ➔' }
         };
@@ -296,7 +296,7 @@ ADMIN_DASHBOARD_TEMPLATE = COMMON_HEAD + """
 </head>
 <body>
     <header class="admin-nav">
-        <div class="admin-brand" data-tr="dashboard">✨ چێشتماڵە - داشبۆرد</div>
+        <div class="admin-brand" data-tr="dashboard">✨ دیوانی سوڵتان - داشبۆرد</div>
         <div style="display: flex; align-items: center; gap: 16px;">
             <span style="color:#cbd5e1; font-size:13px; font-weight:700;">👑 {{ session.get('full_name', 'بەڕێوەبەر') }}</span>
             <a href="/logout" class="btn-exit" data-tr="logout">✕ دەرچوون</a>
@@ -818,7 +818,7 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
                 .ft { text-align: center; font-weight: 700; font-size: 12px; margin-top: 8px; margin-bottom: 0; }
             </style>
             </head><body>
-            <div class="t">چێشتماڵە</div>
+            <div class="t">دیوانی سوڵتان</div>
             <div class="s">مێزی: ${d.table}</div>
             <div class="line"></div>
             <table>
@@ -1494,7 +1494,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 </head>
 <body>
     <div id="welcomeOverlay" style="position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;">
-        <h1 style="color:var(--primary); margin-bottom:10px;">✨ چێشتماڵە</h1>
+        <h1 style="color:var(--primary); margin-bottom:10px;">✨ دیوانی سوڵتان</h1>
         <h3 style="color:var(--text); margin-bottom:30px; font-size:16px;">بەخێربێیت بۆ مێزی {{ table_num }}</h3>
         
         <p style="color:var(--text); margin-bottom:15px; font-size:14px;">تکایە زمانێک هەڵبژێرە / Select Language</p>
@@ -1509,7 +1509,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
 
     <div id="toast">✅ نێردرا</div>
     <div class="hdr">
-        <span style="font-weight:bold; color:var(--primary);">چێشتماڵە</span>
+        <span style="font-weight:bold; color:var(--primary);">دیوانی سوڵتان</span>
         <span class="pill">{{ table_num }}</span>
     </div>
     {% if not allow_ordering %}

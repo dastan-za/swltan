@@ -219,7 +219,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
         const langDictL = {
             'ku': { 'title': '✨ دیوانی سوڵتان', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
             'ar': { 'title': '✨ دیوان سولتان', 'sub': 'يرجى إدخال اسم المستخدم وكلمة المرور', 'lbl_u': 'اسم المستخدم', 'lbl_p': 'كلمة المرور', 'btn': 'تسجيل الدخول ➔' },
-            'en': { 'title': '✨ dewani swltan', 'sub': 'Please enter your username and password', 'lbl_u': 'Username', 'lbl_p': 'Password', 'btn': 'Login ➔' }
+            'en': { 'title': '✨ DEWANI SWLTAN', 'sub': 'Please enter your username and password', 'lbl_u': 'Username', 'lbl_p': 'Password', 'btn': 'Login ➔' }
         };
         
         let themeEl = document.getElementById('theme-' + window.savedTheme);

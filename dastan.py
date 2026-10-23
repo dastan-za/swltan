@@ -59,7 +59,7 @@ def ensure_all_tables():
             except: pass
 
             cursor.execute("""CREATE TABLE IF NOT EXISTS froshtn (order_id INT AUTO_INCREMENT PRIMARY KEY, quantity DECIMAL(10, 3) DEFAULT 1, food_name VARCHAR(255), price DECIMAL(18, 0), category VARCHAR(150), table_cabin VARCHAR(150), notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status VARCHAR(50) DEFAULT 'Active', is_printed TINYINT DEFAULT 0);""")
-            try: cursor.execute("ALTER TABLE froshtn MODIFY COLUMN quantity DECIMAL(10, 3) DEFAULT 1;")
+            try: cursor.execute("ALTER TABLE froshtn ADD COLUMN is_printed TINYINT DEFAULT 0;")
             except: pass
 
             cursor.execute("""CREATE TABLE IF NOT EXISTS table_permissions (table_number INT PRIMARY KEY, allow_ordering TINYINT DEFAULT 1);""")
@@ -2406,8 +2406,7 @@ def save_cart_order():
             if tbl.isdigit():
                 cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number = %s", (int(tbl),))
                 p_row = cur.fetchone()
-                if p_row and not p_row['allow_ordering'] and session.get('role') not in ['mobile_waiter', 'admin']:
-                    return jsonify({'status': 'error', 'message': 'تەنها بۆ بینینە'})
+                if p_row and not p_row['allow_ordering'] and session.get('role') not in ['waiter', 'mobile_waiter', 'admin', 'Manager', 'Cashier']:                    return jsonify({'status': 'error', 'message': 'تەنها بۆ بینینە'})
 
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s", (tbl,))
             for it in cart:

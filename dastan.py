@@ -1098,7 +1098,6 @@ DESKTOP_TABLES_TEMPLATE = COMMON_HEAD + """
 
 # ----------------- Mobile Tables -----------------
 MOBILE_TABLES_TEMPLATE = DESKTOP_TABLES_TEMPLATE.replace('grid-template-columns:repeat(8,1fr)', 'grid-template-columns:repeat(4,1fr)').replace('/desktop', '/mobile/menu')
-
 # ----------------- Desktop POS (iPad/PC) -----------------
 DESKTOP_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
@@ -1108,46 +1107,46 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS - {{ selected_table }}</title>
     <style>
-        * { user-select: none; }
-        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
-        .desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100vh; }
+        * { user-select: none; box-sizing: border-box; }
+        /* چارەسەری ئایپاد: بەکارهێنانی 100dvh لەبری 100vh */
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; overflow: hidden; }
         
-        .cart-side { width: 40%; height: 100vh; display: flex; flex-direction: column; padding: 15px; background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
+        .desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100%; }
+        
+        .cart-side { width: 40%; height: 100%; display: flex; flex-direction: column; padding: 15px; padding-bottom: max(15px, env(safe-area-inset-bottom)); background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
         .c-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .btn-top { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; text-decoration: none; }
         
-        .c-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding-right: 5px; }
-        .c-row { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .c-list { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding-right: 5px; }
+        .c-row { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
         
         .c-ctrl { display: flex; align-items: center; gap: 6px; background: var(--bg); padding: 4px; border-radius: 8px; }
-        .c-btn { width: 28px; height: 28px; border-radius: 6px; border: none; background: #334155; color: #fff; font-weight: bold; font-size: 14px; cursor: pointer; }
+        .c-btn { width: 30px; height: 30px; border-radius: 6px; border: none; background: #334155; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; }
         .c-btn.add { background: var(--primary); color: #000; }
         
-        .cart-bottom { flex-shrink: 0; background: var(--bg); padding: 10px; border-radius: 12px; border: 1px solid var(--border); margin-top: 5px; }
-        .c-tot { font-size: 15px; font-weight: bold; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 8px; }
-        .btn-send { background: var(--accent); color: #000; border: none; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
+        .cart-bottom { flex: 0 0 auto; background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin-top: 5px; }
+        .c-tot { font-size: 16px; font-weight: bold; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .btn-send { background: var(--accent); color: #000; border: none; padding: 10px; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
 
-        .menu-side { width: 60%; height: 100vh; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
+        .menu-side { width: 60%; height: 100%; display: flex; flex-direction: column; padding: 15px; padding-bottom: max(15px, env(safe-area-inset-bottom)); overflow: hidden; }
         .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .cat-btn { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 5px 15px; min-width: 80px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .cat-btn.active { border-color: var(--primary); background: rgba(0,0,0,0.3); }
-        .cat-visual-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; pointer-events: none; }
+        .cat-visual-img { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; pointer-events: none; }
         .cat-visual-title { font-size: 11px; font-weight: bold; color: #fff; pointer-events: none; }
 
-        .food-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; overflow-y: auto; padding-right: 5px; align-content: start; padding-bottom: 20px; }
-        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; text-align: center; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-start; height: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: transform 0.2s; }
-        .f-card:active { transform: scale(0.96); }
-        .f-img { width: 100%; height: 120px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; flex-shrink: 0; }
-        .f-name { font-size: 13px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
-        .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 10px; pointer-events: none; }
+        .food-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; overflow-y: auto; padding-right: 5px; align-content: start; padding-bottom: 20px; }
+        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; cursor: pointer; transition: 0.1s; display: flex; flex-direction: column; justify-content: space-between; min-height: 230px; }
+        .f-card:active { transform: scale(0.97); }
+        .f-img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; pointer-events: none; }
+        .f-name { font-size: 14px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
+        .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 2px; pointer-events: none; }
+        .opt-select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 4px; font-size: 11px; outline: none; }
         
         #toastMsg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 1000; display: none; }
 
         .modal-transfer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
         .modal-transfer-box { background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 20px; width: 100%; max-width: 360px; color: #fff; text-align: center; }
-        
-        /* Modal for Notes */
-        .modal-note { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
     </style>
 </head>
 <body dir="rtl">
@@ -1192,75 +1191,28 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
                 {% for cat, items in categories.items() %}
                 {% set cat_idx = loop.index %}
                 {% for it in items %}
-                
                 <div class="f-card cat-item cat-{{ cat_idx }}" onclick="addF('{{ it.food_name | replace("'", "\\'") }}', {{ it.price }}, '{{ (it.category or '') | replace("'", "\\'") }}', {{ it.id }})">
                     <img src="{{ it.image_path if it.image_path else 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }}" class="f-img" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'">
                     <div class="f-name food-title-disp" data-ku="{{ it.food_name }}" data-ar="{{ it.food_name_ar or it.food_name }}" data-en="{{ it.food_name_en or it.food_name }}">{{ it.food_name }}</div>
                     <div class="f-price">{{ "{:,.0f}".format(it.price) }}</div>
+                    
+                    {% set c_name = (it.category or '') | replace('ي', 'ی') | trim %}
+                    {% set show_r = ('کوڵاو' in c_name or 'پەلەوەر' in c_name or 'کورد' in c_name) %}
+                    {% set show_c = ('پەلەوەر' in c_name or 'مریشک' in c_name) %}
+                    {% set show_fish = ('ماسی' in c_name or 'ماسی' in it.food_name) %}
+                    {% if show_r or show_c or show_fish %}
+                    <div style="display:flex; gap:4px; width:100%;">
+                        {% if show_fish %}
+                        <input type="number" id="w_{{it.id}}" class="opt-select" step="0.25" min="0.25" value="1" onclick="event.stopPropagation()" placeholder="کێش">
+                        {% endif %}
+                        {% if show_r %}<select class="opt-select" id="r_{{it.id}}" onclick="event.stopPropagation()"><option value="">ج. برنج</option><option value="درێژ">درێژ</option><option value="خڕ">خڕ</option><option value="کوردی">کوردی</option></select>{% endif %}
+                        {% if show_c %}<select class="opt-select" id="c_{{it.id}}" onclick="event.stopPropagation()"><option value="">ب. مریشک</option><option value="سینگ">سینگ</option><option value="ڕان">ڕان</option></select>{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
                 {% endfor %}
             </div>
-        </div>
-    </div>
-
-    <!-- Note Modal -->
-    <div class="modal-note" id="noteModal">
-        <div class="m-box" style="background:var(--card); border:1px solid var(--border); border-radius:16px; max-width: 400px; width:100%; display: flex; flex-direction: column; gap: 15px; padding: 20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px;">
-                <h3 style="color:var(--primary); margin:0; font-size:16px;">✏️ زیادکردنی تێبینی</h3>
-                <span style="color:var(--danger); cursor:pointer; font-weight:bold; font-size:20px;" onclick="closeNoteModal()">✕</span>
-            </div>
-            
-            <div style="display:flex; flex-wrap:wrap; gap:6px;" id="quickNotes">
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی درێژ')">برنجی درێژ</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی خڕ')">برنجی خڕ</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنجی کوردی')">برنجی کوردی</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('برنج بە سرکە')">برنج بە سرکە</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('روبەهەنار')">روبەهەنار</button>
-                <button type="button" class="btn-quick-note qn-rice" onclick="addNoteText('قەرەخەرمان')">قەرەخەرمان</button>
-                
-                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('سینگ')">سینگ</button>
-                <button type="button" class="btn-quick-note qn-chicken" onclick="addNoteText('ڕان')">ڕان</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('بێ پیاز')">بێ پیاز</button>
-                
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ١')">قاپی ١</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٢')">قاپی ٢</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٣')">قاپی ٣</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٤')">قاپی ٤</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٥')">قاپی ٥</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٦')">قاپی ٦</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٧')">قاپی ٧</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٨')">قاپی ٨</button>
-                <button type="button" class="btn-quick-note qn-grill" onclick="addNoteText('قاپی ٩')">قاپی ٩</button>
-            </div>
-
-            <!-- Numpad for Fish Weight -->
-            <div id="fishWeightSection" style="display:none; flex-direction:column; gap:10px;">
-                <label style="color:var(--primary); font-size:14px; font-weight:bold; text-align:center;">کێش دیاری بکە (کیلۆگڕام):</label>
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="text" id="fishWeightInput" readonly style="flex:1; background:var(--bg); border:1px solid var(--border); color:#fff; padding:12px; border-radius:8px; font-size:20px; text-align:center; font-weight:bold;">
-                    <button class="btn-num" style="background:var(--danger); padding:12px 20px;" onclick="document.getElementById('fishWeightInput').value=''">C</button>
-                </div>
-                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px;">
-                    <button type="button" class="btn-num" onclick="appendNum('1')">1</button>
-                    <button type="button" class="btn-num" onclick="appendNum('2')">2</button>
-                    <button type="button" class="btn-num" onclick="appendNum('3')">3</button>
-                    <button type="button" class="btn-num" onclick="appendNum('4')">4</button>
-                    <button type="button" class="btn-num" onclick="appendNum('5')">5</button>
-                    <button type="button" class="btn-num" onclick="appendNum('6')">6</button>
-                    <button type="button" class="btn-num" onclick="appendNum('7')">7</button>
-                    <button type="button" class="btn-num" onclick="appendNum('8')">8</button>
-                    <button type="button" class="btn-num" onclick="appendNum('9')">9</button>
-                    <button type="button" class="btn-num" onclick="appendNum('.')">.</button>
-                    <button type="button" class="btn-num" onclick="appendNum('0')">0</button>
-                    <button type="button" class="btn-num" onclick="appendNum('00')">00</button>
-                </div>
-            </div>
-
-            <input type="text" id="customNoteInput" class="c-input" placeholder="یان لێرە بە دەست بنووسە..." style="padding:12px; width:100%; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px; font-family:inherit; margin-top:10px;">
-            
-            <button style="background:var(--accent); color:#000; padding:12px; border:none; border-radius:10px; font-weight:bold; font-size:15px; width:100%; cursor:pointer; margin-top:5px;" onclick="saveNote()">تۆمارکردن</button>
         </div>
     </div>
 
@@ -1279,7 +1231,6 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
 
     <script>
         let cart = [], orig = []; const tbl = "{{ selected_table }}";
-        let editingNoteIdx = -1;
 
         window.addEventListener('langChanged', () => {
             let l = window.savedLang;
@@ -1295,14 +1246,25 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         }
 
         function addF(n, p, c, id) {
-            let fn = n;
-            let fd = false;
+            let fn = n, pts = [];
+            let rel = document.getElementById('r_'+id), cel = document.getElementById('c_'+id);
+            if(rel && rel.value) pts.push(rel.value);
+            if(cel && cel.value) pts.push(cel.value);
+            if(pts.length>0) fn += ` (${pts.join(' - ')})`;
             
+            let qtyToAdd = 1;
+            let wEl = document.getElementById('w_'+id);
+            if(wEl && wEl.value) {
+                let w = parseFloat(wEl.value);
+                if(!isNaN(w) && w > 0) qtyToAdd = w;
+            }
+
+            let fd = false;
             for(let i=cart.length-1; i>=0; i--) {
                 if(cart[i].is_divider) break;
-                if(cart[i].ku === fn) { cart[i].qty += 1; fd=true; break; }
+                if(cart[i].ku === fn) { cart[i].qty += qtyToAdd; fd=true; break; }
             }
-            if(!fd) cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:1, cat:c});
+            if(!fd) cart.push({is_divider:false, ku:fn, full_name:fn, price:p, qty:qtyToAdd, cat:c});
             ren();
         }
 
@@ -1315,71 +1277,28 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         }
         function delI(idx) { cart.splice(idx, 1); ren(); }
 
-        function appendNum(val) {
-            let inp = document.getElementById('fishWeightInput');
-            if (val === '.' && inp.value.includes('.')) return;
-            inp.value += val;
+        function editQty(idx) {
+            let nQ = prompt('بڕی نوێ بنووسە:', parseFloat(cart[idx].qty.toFixed(3)));
+            if (nQ !== null && !isNaN(parseFloat(nQ)) && parseFloat(nQ) > 0) {
+                cart[idx].qty = parseFloat(nQ);
+                ren();
+            } else if (nQ !== null && parseFloat(nQ) === 0) {
+                delI(idx);
+            }
         }
 
         function editNote(idx) {
-            editingNoteIdx = idx;
-            document.getElementById('customNoteInput').value = '';
-            
-            let cat = cart[idx].cat || '';
-            let n = cart[idx].ku || '';
-            let isGrill = cat.includes('برژاو') || n.includes('کەباب') || n.includes('تکە');
-            let isPoultry = cat.includes('پەلەوەر') || n.includes('مریشک');
-            let isBoiled = cat.includes('کوڵاو') || cat.includes('کورد') || cat.includes('شۆربا');
-            let isFish = cat.includes('ماسی') || n.includes('ماسی');
-
-            if (isFish) {
-                document.getElementById('quickNotes').style.display = 'none';
-                document.getElementById('fishWeightSection').style.display = 'flex';
-                document.getElementById('fishWeightInput').value = cart[idx].qty;
-            } else {
-                document.getElementById('fishWeightSection').style.display = 'none';
-                document.getElementById('quickNotes').style.display = 'flex';
-                document.querySelectorAll('#quickNotes .btn-quick-note').forEach(b => {
-                    b.style.display = 'none';
-                    if (isGrill && b.classList.contains('qn-grill')) b.style.display = '';
-                    if (isPoultry && (b.classList.contains('qn-rice') || b.classList.contains('qn-chicken'))) b.style.display = '';
-                    if (isBoiled && !isPoultry && b.classList.contains('qn-rice')) b.style.display = '';
-                    if (!isGrill && !isPoultry && !isBoiled && !isFish) b.style.display = '';
-                });
-            }
-            
-            document.getElementById('noteModal').style.display = 'flex';
-        }
-        function closeNoteModal() {
-            document.getElementById('noteModal').style.display = 'none';
-            editingNoteIdx = -1;
-        }
-        function addNoteText(txt) {
-            let inp = document.getElementById('customNoteInput');
-            inp.value = inp.value ? inp.value + ' - ' + txt : txt;
-        }
-        function saveNote() {
-            if (editingNoteIdx > -1) {
-                let note = document.getElementById('customNoteInput').value;
-                if (note && note.trim() !== '') {
-                    cart[editingNoteIdx].ku += ' (' + note.trim() + ')';
-                    cart[editingNoteIdx].full_name = cart[editingNoteIdx].ku;
-                }
-                
-                if (document.getElementById('fishWeightSection').style.display !== 'none') {
-                    let w = parseFloat(document.getElementById('fishWeightInput').value);
-                    if (!isNaN(w) && w > 0) {
-                        cart[editingNoteIdx].qty = w;
-                    }
-                }
+            let note = prompt('تێبینی (بۆ نموونە: بێ پیاز):');
+            if (note && note.trim() !== '') {
+                cart[idx].ku += ' (' + note.trim() + ')';
+                cart[idx].full_name = cart[idx].ku;
                 ren();
             }
-            closeNoteModal();
         }
 
         function addDiv() {
             if(cart.length===0 || (cart[cart.length-1] && cart[cart.length-1].is_divider)) return;
-            cart.push({is_divider:true, ku:'─── قاپی نوێ ───', full_name:'───', price:0, qty:1, cat:''}); ren();
+            cart.push({is_divider:true, ku:'-----------------', full_name:'-----------------', price:0, qty:1, cat:''}); ren();
         }
 
         function ren() {
@@ -1387,20 +1306,20 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
             let l = window.savedLang;
             cart.forEach((it, i) => {
                 if(it.is_divider) {
-                    pN++; h += `<div style="background:#8b5cf6; padding:8px; border-radius:6px; font-size:13px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:5px;"><span>🍽 قاپی ${pN}</span><span onclick="delI(${i})" style="cursor:pointer; background:#ef4444; padding:2px 8px; border-radius:4px; color:#fff;">✕</span></div>`;
+                    pN++; h += `<div style="background:#8b5cf6; padding:8px; border-radius:6px; font-size:14px; font-weight:bold; text-align:center; color:#fff; margin-bottom:5px;">-----------------</div>`;
                 } else {
                     if(it.cat==='برژاو' || it.ku.includes('کەباب')) hG = true;
                     tot += it.price * it.qty;
-                    let dName = it[l] || it.ku;
+                    let dName = it.ku;
                     
                     h += `<div class="c-row">
-                        <div style="flex:1; text-align:right; font-size:13px; font-weight:bold; padding-left:10px;">${dName}</div>
+                        <div style="flex:1; text-align:right; font-size:14px; font-weight:bold; padding-left:10px;">${dName}</div>
                         <div class="c-ctrl">
                             <span style="color:var(--accent); font-size:12px; font-weight:bold; margin-left:10px;">${(it.price*it.qty).toLocaleString()}</span>
                             <button class="c-btn" style="background:#ef4444; font-size:12px;" onclick="delI(${i})">🗑</button>
-                            <button class="c-btn" style="background:#3b82f6; font-size:12px;" onclick="editNote(${i})">✏</button>
+                            <button class="c-btn" style="background:#3b82f6; font-size:12px;" onclick="editNote(${i})">✏️</button>
                             <button class="c-btn" onclick="updQ(${i},-1)">-</button>
-                            <span style="width:30px;text-align:center;font-weight:bold;font-size:14px;">${parseFloat(it.qty.toFixed(3))}</span>
+                            <span style="width:35px;text-align:center;font-weight:bold;font-size:15px;cursor:pointer;background:rgba(255,255,255,0.1);padding:4px;border-radius:4px;" onclick="editQty(${i})" title="گۆڕینی بڕ">${parseFloat(it.qty.toFixed(3))}</span>
                             <button class="c-btn add" onclick="updQ(${i},1)">+</button>
                         </div>
                     </div>`;
@@ -1439,7 +1358,7 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         fetch('/get_table_orders/'+encodeURIComponent(tbl)).then(r=>r.json()).then(d=>{
             if(d) {
                 d.forEach(it=>{
-                    let o = {is_divider:it.food_name.includes('───'), ku:it.food_name, full_name:it.food_name, price:parseFloat(it.price), qty:parseFloat(it.quantity), cat:it.category};
+                    let o = {is_divider:it.food_name.includes('───') || it.food_name.includes('---'), ku:it.food_name, full_name:it.food_name, price:parseFloat(it.price), qty:parseFloat(it.quantity), cat:it.category};
                     cart.push(o); orig.push(JSON.parse(JSON.stringify(o)));
                 });
                 ren();

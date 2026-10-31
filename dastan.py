@@ -2414,7 +2414,7 @@ def save_cart_order():
             for it in cart:
                 fname = str(it.get('ku') or it.get('full_name') or it.get('food_name') or '')
                 is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname or '---' in fname
-                final_name = "--- قاپی نوێ ---" if is_div else fname
+                final_name = "-----------------" if is_div else fname
                 cur.execute("""
                     INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) 
                     VALUES (%s, %s, %s, %s, %s, NOW(), 1)
@@ -2439,7 +2439,7 @@ def save_cart_order():
                     if diff > 0:
                         if plate_idx > 1 and not current_plate_printed:
                             kitchen_inserts.append({
-                                'name': f'--- قاپی {plate_idx} ---', 
+                                'name': '-----------------', 
                                 'qty': 1, 
                                 'price': 0, 
                                 'cat': it.get('cat', 'برژاو'), 

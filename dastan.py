@@ -2375,7 +2375,6 @@ def toggle_table_permission():
         return jsonify({'status': 'success', 'allow_ordering': nv})
     except: return jsonify({'status': 'error'})
     finally: conn.close()
-
 @app.route('/save_cart_order', methods=['POST'])
 def save_cart_order():
     data = request.get_json() or {}
@@ -2387,13 +2386,14 @@ def save_cart_order():
         parsed = {}
         plate_idx = 1
         for it in items_list:
-            fname = str(it.get('full_name') or it.get('food_name') or '')
-            is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname
+            fname = str(it.get('ku') or it.get('full_name') or it.get('food_name') or '')
+            is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname or '---' in fname
             if is_div:
                 plate_idx += 1
             else:
                 key = f"{fname}__P{plate_idx}"
-                if key not in parsed: parsed[key] = {'real_name': fname, 'qty': 0, 'price': float(it.get('price', 0)), 'cat': it.get('cat', 'گشتی')}
+                if key not in parsed: 
+                    parsed[key] = {'real_name': fname, 'qty': 0, 'price': float(it.get('price', 0)), 'cat': it.get('cat', 'گشتی')}
                 parsed[key]['qty'] += float(it.get('qty', 1))
         return parsed
 
@@ -2406,24 +2406,31 @@ def save_cart_order():
             if tbl.isdigit():
                 cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number = %s", (int(tbl),))
                 p_row = cur.fetchone()
-                if p_row and not p_row['allow_ordering'] and session.get('role') not in ['waiter', 'mobile_waiter', 'admin', 'Manager', 'Cashier']:                    return jsonify({'status': 'error', 'message': 'تەنها بۆ بینینە'})
+                if p_row and not p_row['allow_ordering'] and session.get('role') not in ['mobile_waiter', 'admin']:
+                    return jsonify({'status': 'error', 'message': 'تەنها بۆ بینینە'})
 
+            # سڕینەوەی داتای کۆنی مێزەکە و دانانەوەی سەبەتە نوێیەکە بۆ لای کاشێر
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s", (tbl,))
             for it in cart:
                 fname = str(it.get('ku') or it.get('full_name') or it.get('food_name') or '')
-                is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname
-                final_name = "─── قاپی نوێ ───" if is_div else fname
-                cur.execute("INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) VALUES (%s, %s, %s, %s, %s, NOW(), 1)", (tbl, final_name, float(it.get('qty', 1)), float(it.get('price', 0)), it.get('cat', 'گشتی')))
+                is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname or '---' in fname
+                final_name = "--- قاپی نوێ ---" if is_div else fname
+                cur.execute("""
+                    INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) 
+                    VALUES (%s, %s, %s, %s, %s, NOW(), 1)
+                """, (tbl, final_name, float(it.get('qty', 1)), float(it.get('price', 0)), it.get('cat', 'گشتی')))
 
+            # ئامادەکردنی لیستی مەتبەخ بۆ پرێنتکردن (is_printed = 0)
             kitchen_inserts = []
             plate_idx = 1
             current_plate_printed = False
 
             for it in cart:
                 fname = str(it.get('ku') or it.get('full_name') or it.get('food_name') or '')
-                is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname
+                is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname or '---' in fname
                 if is_div:
-                    plate_idx += 1; current_plate_printed = False
+                    plate_idx += 1
+                    current_plate_printed = False
                 else:
                     key = f"{fname}__P{plate_idx}"
                     new_qty = float(it.get('qty', 1))
@@ -2431,25 +2438,47 @@ def save_cart_order():
                     diff = new_qty - old_qty
                     if diff > 0:
                         if plate_idx > 1 and not current_plate_printed:
-                            kitchen_inserts.append({'name': '─── قاپی نوێ ───', 'qty': 1, 'price': 0, 'cat': 'برژاو', 'action': 'add'})
+                            kitchen_inserts.append({
+                                'name': f'--- قاپی {plate_idx} ---', 
+                                'qty': 1, 
+                                'price': 0, 
+                                'cat': it.get('cat', 'برژاو'), 
+                                'action': 'add'
+                            })
                             current_plate_printed = True
-                        kitchen_inserts.append({'name': f"+ {fname}", 'qty': diff, 'price': float(it.get('price', 0)), 'cat': it.get('cat', 'گشتی'), 'action': 'add'})
+                        kitchen_inserts.append({
+                            'name': f"+ {fname}", 
+                            'qty': diff, 
+                            'price': float(it.get('price', 0)), 
+                            'cat': it.get('cat', 'گشتی'), 
+                            'action': 'add'
+                        })
 
             for k, old_data in old_map.items():
                 new_qty = new_map.get(k, {}).get('qty', 0)
                 diff = new_qty - old_data['qty']
                 if diff < 0:
-                    kitchen_inserts.append({'name': f"سڕاوەتەوە: {old_data['real_name']}", 'qty': abs(diff), 'price': old_data['price'], 'cat': old_data['cat'], 'action': 'delete'})
+                    kitchen_inserts.append({
+                        'name': f"سڕاوەتەوە: {old_data['real_name']}", 
+                        'qty': abs(diff), 
+                        'price': old_data['price'], 
+                        'cat': old_data['cat'], 
+                        'action': 'delete'
+                    })
 
             for ki in kitchen_inserts:
                 tbl_suffix = " [زیادکراو]" if ki['action'] == 'add' else " [سڕاوەتەوە]"
-                cur.execute("INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) VALUES (%s, %s, %s, %s, %s, NOW(), 0)", (tbl + tbl_suffix, ki['name'], float(ki['qty']), float(ki['price']), ki['cat']))
+                cur.execute("""
+                    INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) 
+                    VALUES (%s, %s, %s, %s, %s, NOW(), 0)
+                """, (tbl + tbl_suffix, ki['name'], float(ki['qty']), float(ki['price']), ki['cat']))
 
         conn.commit()
         return jsonify({'status': 'success'})
-    except Exception as ex: return jsonify({'status': 'error', 'message': str(ex)})
-    finally: conn.close()
-
+    except Exception as ex: 
+        return jsonify({'status': 'error', 'message': str(ex)})
+    finally: 
+        conn.close()
 @app.route('/get_table_orders/<path:table_num>')
 def get_table_orders(table_num):
     conn = get_db()

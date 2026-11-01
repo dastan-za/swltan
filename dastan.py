@@ -1096,51 +1096,56 @@ DESKTOP_TABLES_TEMPLATE = COMMON_HEAD + """
 </html>
 """
 
-# ----------------- Mobile Tables -----------------
-MOBILE_TABLES_TEMPLATE = DESKTOP_TABLES_TEMPLATE.replace('grid-template-columns:repeat(8,1fr)', 'grid-template-columns:repeat(4,1fr)').replace('/desktop', '/mobile/menu')
 # ----------------- Desktop POS (iPad/PC) -----------------
 DESKTOP_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>POS - {{ selected_table }}</title>
     <style>
         * { user-select: none; box-sizing: border-box; }
-        /* چارەسەری ئایپاد: بەکارهێنانی 100dvh لەبری 100vh */
-        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; overflow: hidden; }
         
-        .desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100%; }
+        /* قفڵکردنی تەواوەتی شاشە بۆ ئایپاد تا بە هیچ جۆرێک سەروخوار نەکات */
+        html, body { 
+            margin: 0; padding: 0; 
+            background: var(--bg); color: var(--text); 
+            width: 100vw; height: 100vh; height: 100dvh; 
+            overflow: hidden; position: fixed; top: 0; left: 0; 
+        }
         
-        .cart-side { width: 40%; height: 100%; display: flex; flex-direction: column; padding: 15px; padding-bottom: max(15px, env(safe-area-inset-bottom)); background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
+        .desktop-main-layout { display: flex; flex-direction: row; width: 100%; height: 100%; }
+        
+        .cart-side { width: 40%; height: 100%; display: flex; flex-direction: column; padding: 15px; background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
         .c-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .btn-top { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; text-decoration: none; }
         
-        .c-list { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding-right: 5px; }
+        .c-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; padding-right: 5px; }
         .c-row { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
         
         .c-ctrl { display: flex; align-items: center; gap: 6px; background: var(--bg); padding: 4px; border-radius: 8px; }
         .c-btn { width: 30px; height: 30px; border-radius: 6px; border: none; background: #334155; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; }
         .c-btn.add { background: var(--primary); color: #000; }
         
-        .cart-bottom { flex: 0 0 auto; background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin-top: 5px; }
+        .cart-bottom { flex-shrink: 0; background: var(--bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin-top: 5px; }
         .c-tot { font-size: 16px; font-weight: bold; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 10px; }
         .btn-send { background: var(--accent); color: #000; border: none; padding: 10px; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
 
-        .menu-side { width: 60%; height: 100%; display: flex; flex-direction: column; padding: 15px; padding-bottom: max(15px, env(safe-area-inset-bottom)); overflow: hidden; }
+        .menu-side { width: 60%; height: 100%; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
         .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .cat-btn { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 5px 15px; min-width: 80px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .cat-btn.active { border-color: var(--primary); background: rgba(0,0,0,0.3); }
         .cat-visual-img { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; pointer-events: none; }
         .cat-visual-title { font-size: 11px; font-weight: bold; color: #fff; pointer-events: none; }
 
-        .food-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; overflow-y: auto; padding-right: 5px; align-content: start; padding-bottom: 20px; }
-        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; cursor: pointer; transition: 0.1s; display: flex; flex-direction: column; justify-content: space-between; min-height: 230px; }
+        /* لێرەدا قەبارەی وێنەکانمان گونجاند تا زۆرترین خواردن جێی ببێتەوە بەبێ سەروخوارکردن */
+        .food-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; overflow-y: auto; padding-right: 5px; align-content: start; padding-bottom: 20px; }
+        .f-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; cursor: pointer; transition: 0.1s; display: flex; flex-direction: column; justify-content: space-between; min-height: 180px; }
         .f-card:active { transform: scale(0.97); }
-        .f-img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; pointer-events: none; }
-        .f-name { font-size: 14px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
-        .f-price { color: var(--accent); font-weight: bold; font-size: 13px; margin-bottom: 2px; pointer-events: none; }
+        .f-img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; margin-bottom: 6px; pointer-events: none; }
+        .f-name { font-size: 13px; font-weight: bold; line-height: 1.3; margin-bottom: 4px; pointer-events: none; }
+        .f-price { color: var(--accent); font-weight: bold; font-size: 12px; margin-bottom: 2px; pointer-events: none; }
         .opt-select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: 4px; font-size: 11px; outline: none; }
         
         #toastMsg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; padding: 10px 24px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 1000; display: none; }
@@ -1330,11 +1335,16 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
             document.getElementById('btnDiv').style.display = hG ? 'block' : 'none';
         }
 
+        let isSending = false;
         function sendO() {
-            if(cart.length===0) return;
+            if(cart.length === 0 || isSending) return;
+            isSending = true;
             let fCart = cart.map(it => ({ is_divider: it.is_divider, food_name: it.ku, qty: it.qty, price: it.price, cat: it.cat || 'گشتی' }));
             fetch('/save_cart_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:tbl, cart_items:fCart, original_items:orig}) })
-            .then(r=>r.json()).then(d=>{ if(d.status==='success') location.href='/desktop/tables'; else alert('هەڵە'); });
+            .then(r=>r.json()).then(d=>{ 
+                if(d.status==='success') location.href='/desktop/tables'; 
+                else { isSending = false; alert('هەڵە'); }
+            }).catch(() => { isSending = false; });
         }
 
         function clrT() {

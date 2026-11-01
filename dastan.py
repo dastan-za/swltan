@@ -1109,10 +1109,11 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
     <title>POS - {{ selected_table }}</title>
     <style>
         * { user-select: none; }
-        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
-        .desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100vh; }
+body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100dvh; min-height: -webkit-fill-available; overflow: hidden; }
+.desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100%; }
         
-        .cart-side { width: 40%; height: 100vh; display: flex; flex-direction: column; padding: 15px; background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
+.cart-side { width: 40%; height: 100%; display: flex; flex-direction: column; padding: 15px; background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
+        
         .c-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .btn-top { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; text-decoration: none; }
         
@@ -1127,8 +1128,7 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
         .c-tot { font-size: 15px; font-weight: bold; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 8px; }
         .btn-send { background: var(--accent); color: #000; border: none; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
 
-        .menu-side { width: 60%; height: 100vh; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
-        .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
+        .menu-side { width: 60%; height: 100%; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }        .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .cat-btn { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 5px 15px; min-width: 80px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .cat-btn.active { border-color: var(--primary); background: rgba(0,0,0,0.3); }
         .cat-visual-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; pointer-events: none; }

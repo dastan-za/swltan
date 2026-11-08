@@ -767,8 +767,11 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
             fetch('/get_table_orders/' + encodeURIComponent(tbl)).then(r=>r.json()).then(items => {
                 let tbody = document.getElementById('chList'); tbody.innerHTML = ''; tot = 0;
                 items.forEach(it => {
-                    let line = it.price * parseFloat(it.quantity); tot += line;
-                    tbody.innerHTML += `<tr><td style="text-align:right;">${it.food_name}</td><td>${parseFloat(it.quantity)}</td><td>${it.price}</td><td>${line}</td></tr>`;
+                    let q = parseFloat(it.quantity) || 0;
+                    let p = parseFloat(it.price) || 0;
+                    let line = p * q;
+                    tot += line;
+                    tbody.innerHTML += `<tr><td style="text-align:right;">${it.food_name}</td><td>${q}</td><td>${p}</td><td>${line}</td></tr>`;
                 });
                 document.getElementById('lblTot').innerText = tot; document.getElementById('txtPaid').value = tot;
                 calcChange(); document.getElementById('chModal').style.display = 'flex';

@@ -6,11 +6,15 @@ import pymysql.cursors
 import os
 import re
 import base64
+import json
+from openai import OpenAI
 
 app = Flask(__name__)
 app.secret_key = 'shahoor_all_in_one_pos_2026_v10'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 
+# بەکارهێنانی کلیلەکە لە ڕێگەی گۆڕاوی ژینگە (Environment Variable)
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -49,7 +53,6 @@ def ensure_all_tables():
             cursor.execute("""CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL UNIQUE, password VARCHAR(100) NOT NULL, full_name VARCHAR(150) DEFAULT '', role VARCHAR(50) DEFAULT 'Waiter', can_view_menu TINYINT DEFAULT 1, can_view_tables TINYINT DEFAULT 1, can_view_cashier TINYINT DEFAULT 0, can_view_qsa TINYINT DEFAULT 0, can_view_reports TINYINT DEFAULT 0, can_view_settings TINYINT DEFAULT 0, is_active TINYINT DEFAULT 1);""")
             cursor.execute("""CREATE TABLE IF NOT EXISTS nse (id INT AUTO_INCREMENT PRIMARY KEY, food_name VARCHAR(255) NOT NULL, price DECIMAL(18, 0) NOT NULL DEFAULT 0, category VARCHAR(150) DEFAULT 'گشتی', image_path TEXT, nsecol VARCHAR(50) DEFAULT '');""")
             
-            # گۆڕینی ستوونی وێنە بۆ LONGTEXT بۆ ئەوەی جێگەی وێنەی Base64 ببێتەوە لە Railway
             try: cursor.execute("ALTER TABLE nse MODIFY COLUMN image_path LONGTEXT;")
             except: pass
             
@@ -218,7 +221,7 @@ LOGIN_TEMPLATE = COMMON_HEAD + """
     <script>
         const langDictL = {
             'ku': { 'title': '✨ دیوانی سوڵتان', 'sub': 'تکایە ناوی بەکارهێنەر و وشەی نهێنی بنووسە', 'lbl_u': 'ناوی بەکارهێنەر', 'lbl_p': 'وشەی نهێنی', 'btn': 'چوونەژوورەوە ➔' },
-            'ar': { 'title': '✨ دیوان سولتان', 'sub': 'يرجى إدخال اسم المستخدم وكلمة المرور', 'lbl_u': 'اسم المستخدم', 'lbl_p': 'كلمة المرور', 'btn': 'تسجيل الدخول ➔' },
+            'ar': { 'title': '✨ ديوان سولتان', 'sub': 'يرجى إدخال اسم المستخدم وكلمة المرور', 'lbl_u': 'اسم المستخدم', 'lbl_p': 'كلمة المرور', 'btn': 'تسجيل الدخول ➔' },
             'en': { 'title': '✨ Dewani Swltan', 'sub': 'Please enter your username and password', 'lbl_u': 'Username', 'lbl_p': 'Password', 'btn': 'Login ➔' }
         };
         
@@ -557,8 +560,8 @@ WEB_WORKERS_TEMPLATE = COMMON_HEAD + """
                 <div style="font-weight:bold; width: 150px; color:var(--primary);">{{ aw.name }}</div>
                 <div style="display:flex; gap:15px; flex:1; align-items:center;">
                     <label style="cursor:pointer;"><input type="radio" name="status_{{ aw.id }}" value="هاتوو" {{ 'checked' if aw.last_status not in ['نەهاتوو', 'نیوو شەفت'] else '' }}> هاتوو</label>
-                    <label style="cursor:pointer; color:var(--accent);"><input type="radio" name="status_{{ aw.id }}" value="نیوو شەفت" {{ 'checked' if aw.last_status == 'نیوو شەفت' else '' }}> نیوو شەفت</label>
-                    <label style="cursor:pointer; color:var(--danger);"><input type="radio" name="status_{{ aw.id }}" value="نەهاتوو" {{ 'checked' if aw.last_status == 'نەهاتوو' else '' }}> نەهاتوو</label>
+                    <label style="cursor:pointer; color:var(--accent)"><input type="radio" name="status_{{ aw.id }}" value="نیوو شەفت" {{ 'checked' if aw.last_status == 'نیوو شەفت' else '' }}> نیوو شەفت</label>
+                    <label style="cursor:pointer; color:var(--danger)"><input type="radio" name="status_{{ aw.id }}" value="نەهاتوو" {{ 'checked' if aw.last_status == 'نەهاتوو' else '' }}> نەهاتوو</label>
                 </div>
                 <div><input type="number" name="bonus_{{ aw.id }}" class="c-input" value="0" placeholder="بەخشش" style="width:100px;"></div>
             </div>
@@ -791,15 +794,13 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
             <meta charset="utf-8">
             <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
-                @page { 
-                    margin: 0; 
-                }
+                @page { margin: 0; }
                 body {
                     font-family: 'Noto Kufi Arabic', sans-serif; 
-                    width: 72mm; /* کەمکرایەوە بۆ ٧٢ ملم تا ژمارەکان نەبڕدرێن */
+                    width: 72mm; 
                     margin: 0 auto; 
                     padding: 3mm; 
-                    font-size: 10px; /* فۆنتەکە بچووک کرایەوە */
+                    font-size: 10px; 
                     color: #000;
                     box-sizing: border-box;
                 }
@@ -812,7 +813,6 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
                 th { border-bottom: 1px solid #000; font-size: 10px; font-weight: 700; }
                 td { font-size: 10px; font-weight: 600; vertical-align: top; }
                 
-                /* ڕێکخستنی پانی کۆڵۆمەکان بۆ ئەوەی جێگەی ژمارەکان فراوان بێت و نەبڕدرێن */
                 .col-name { width: 50%; text-align: right; word-wrap: break-word; }
                 .col-qty { width: 15%; text-align: center; }
                 .col-tot { width: 35%; text-align: left; }
@@ -1112,11 +1112,10 @@ DESKTOP_TEMPLATE = COMMON_HEAD + """
     <title>POS - {{ selected_table }}</title>
     <style>
         * { user-select: none; }
-body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100dvh; min-height: -webkit-fill-available; overflow: hidden; }
-.desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100%; }
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100dvh; min-height: -webkit-fill-available; overflow: hidden; }
+        .desktop-main-layout { display: flex; flex-direction: row; width: 100vw; height: 100%; }
         
-.cart-side { width: 40%; height: 100%; display: flex; flex-direction: column; padding: 15px; background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
-        
+        .cart-side { width: 40%; height: 100%; display: flex; flex-direction: column; padding: 15px; background: rgba(0,0,0,0.2); border-left: 1px solid var(--border); overflow: hidden; }
         .c-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .btn-top { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; text-decoration: none; }
         
@@ -1131,7 +1130,8 @@ body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height:
         .c-tot { font-size: 15px; font-weight: bold; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 8px; }
         .btn-send { background: var(--accent); color: #000; border: none; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
 
-        .menu-side { width: 60%; height: 100%; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }        .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
+        .menu-side { width: 60%; height: 100%; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
+        .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .cat-btn { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 5px 15px; min-width: 80px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .cat-btn.active { border-color: var(--primary); background: rgba(0,0,0,0.3); }
         .cat-visual-img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; margin-bottom: 5px; pointer-events: none; }
@@ -1173,6 +1173,7 @@ body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height:
                 <div class="c-tot"><span>کۆی گشتی:</span><span id="totTxt">0</span></div>
                 <div style="display:flex; gap:10px;">
                     <button class="btn-send" style="background:#8b5cf6; flex:1; display:none; color:#fff;" id="btnDiv" onclick="addDiv()">+ هێڵ</button>
+                    <button type="button" class="btn-send" style="background:#3b82f6; color:#fff; flex:1;" onclick="startVoiceAPI()">🎤 دەنگی</button>
                     <button class="btn-send" style="flex:2;" onclick="sendO()">ناردن ➔</button>
                 </div>
             </div>
@@ -1448,6 +1449,48 @@ body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height:
                 ren();
             }
         });
+
+        function startVoiceAPI() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return alert("بەداخەوە وێبگەڕەکەت پشتگیری ئەم تایبەتمەندییە ناکات.");
+            
+            const rec = new SpeechRecognition();
+            rec.lang = 'ar-IQ';
+            
+            let toast = document.getElementById('toastMsg') || document.getElementById('toast');
+            
+            rec.onstart = () => {
+                if(toast) { toast.innerText = "🎤 قسە بکە..."; toast.style.display = 'block'; toast.style.background = '#3b82f6'; }
+            };
+            
+            rec.onresult = (e) => {
+                let text = e.results[0][0].transcript;
+                if(toast) { toast.innerText = "⏳ چاوەڕێبە... (AI بیردەکاتەوە)"; toast.style.background = '#f59e0b'; }
+                
+                fetch('/api/voice_order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: text})
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if(d.status === 'success') {
+                        d.orders.forEach(o => {
+                            if (typeof addF === 'function' && addF.length === 4) {
+                                for(let i=0; i<o.qty; i++) addF(o.food_name, o.price, o.category, o.id);
+                            } else if (typeof addF === 'function' && addF.length === 5) {
+                                addF(o.food_name, o.qty, o.price, o.category, o.id);
+                            }
+                        });
+                        if(toast) { toast.innerText = "✅ زیادکرا"; toast.style.background = 'var(--accent)'; setTimeout(()=>toast.style.display='none', 2000); }
+                    } else {
+                        alert("کێشەیەک ڕوویدا: " + d.message);
+                        if(toast) toast.style.display = 'none';
+                    }
+                });
+            };
+            rec.start();
+        }
     </script>
 </body>
 </html>
@@ -1571,6 +1614,7 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
             <div class="m-list" id="mList"></div>
             <div style="display:flex; gap:10px;">
                 <button class="btn-send" style="background:#8b5cf6; flex:1; display:none; color:#fff;" id="btnDivM" onclick="addDivM()">+ هێڵ</button>
+                <button type="button" class="btn-send" style="background:#3b82f6; color:#fff; flex:1;" onclick="startVoiceAPI()">🎤 دەنگی</button>
                 <button class="btn-send" style="flex:2;" onclick="sendOrder()" data-tr="send">ناردن بۆ مەتبەخ</button>
             </div>
         </div>
@@ -1841,6 +1885,48 @@ CUSTOMER_MENU_TEMPLATE = COMMON_HEAD + """
             });
         }
         window.onload = fetchTable;
+
+        function startVoiceAPI() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return alert("بەداخەوە وێبگەڕەکەت پشتگیری ئەم تایبەتمەندییە ناکات.");
+            
+            const rec = new SpeechRecognition();
+            rec.lang = 'ar-IQ';
+            
+            let toastMsg = document.getElementById('toastMsg') || document.getElementById('toast');
+            
+            rec.onstart = () => {
+                if(toastMsg) { toastMsg.innerText = "🎤 قسە بکە..."; toastMsg.style.display = 'block'; toastMsg.style.background = '#3b82f6'; }
+            };
+            
+            rec.onresult = (e) => {
+                let text = e.results[0][0].transcript;
+                if(toastMsg) { toastMsg.innerText = "⏳ چاوەڕێبە... (AI بیردەکاتەوە)"; toastMsg.style.background = '#f59e0b'; }
+                
+                fetch('/api/voice_order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: text})
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if(d.status === 'success') {
+                        d.orders.forEach(o => {
+                            if (typeof addF === 'function' && addF.length === 4) {
+                                for(let i=0; i<o.qty; i++) addF(o.food_name, o.price, o.category, o.id);
+                            } else if (typeof addF === 'function' && addF.length === 5) {
+                                addF(o.food_name, o.qty, o.price, o.category, o.id);
+                            }
+                        });
+                        if(toastMsg) { toastMsg.innerText = "✅ زیادکرا"; toastMsg.style.background = 'var(--accent)'; setTimeout(()=>toastMsg.style.display='none', 2000); }
+                    } else {
+                        alert("کێشەیەک ڕوویدا: " + d.message);
+                        if(toastMsg) toastMsg.style.display = 'none';
+                    }
+                });
+            };
+            rec.start();
+        }
     </script>
 </body>
 </html>
@@ -2378,6 +2464,7 @@ def toggle_table_permission():
         return jsonify({'status': 'success', 'allow_ordering': nv})
     except: return jsonify({'status': 'error'})
     finally: conn.close()
+
 @app.route('/save_cart_order', methods=['POST'])
 def save_cart_order():
     data = request.get_json() or {}
@@ -2482,6 +2569,7 @@ def save_cart_order():
         return jsonify({'status': 'error', 'message': str(ex)})
     finally: 
         conn.close()
+
 @app.route('/get_table_orders/<path:table_num>')
 def get_table_orders(table_num):
     conn = get_db()
@@ -2526,6 +2614,63 @@ def transfer_table_orders():
         return jsonify({'status': 'success'})
     except Exception as ex: return jsonify({'status': 'error', 'message': str(ex)})
     finally: conn.close()
+
+# ڕاوتی نوێ بۆ API ی دەنگی (Voice Order)
+@app.route('/api/voice_order', methods=['POST'])
+def voice_order():
+    data = request.get_json()
+    text = data.get('text', '')
+    
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, food_name, price, category FROM nse WHERE food_name != ''")
+            menu_items = cur.fetchall()
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+    finally:
+        conn.close()
+        
+    menu_names = [item['food_name'] for item in menu_items]
+    
+    prompt = f"""تۆ یاریدەدەرێکی کاشێریت لە چێشتخانەیەک. ئەم دەقەی خوارەوە لەلایەن گارسۆنێکەوە گوتراوە بۆ داواکردنی خواردن.
+    ئەرکی تۆ ئەوەیە ناوی خواردنەکان و بڕەکەیان دەربهێنیت. پێویستە ناوەکان بە نزیکترین شێوە بگونجێنیت لەگەڵ ئەم لیستەی مێنیوی ئێمەدا: {menu_names}
+    ئەنجامەکە تەنها بەم فۆرماتەی JSON بگەڕێنەوە بەبێ هیچ قسە و دەقێکی تر، تەنها و تەنها ئەڕەیەکە:
+    [{{\"food_name\": \"کەباب\", \"qty\": 2}}]
+    
+    دەقە گوتراوەکە: {text}"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        result_text = response.choices[0].message.content.strip()
+        
+        if result_text.startswith("```json"):
+            result_text = result_text[7:-3]
+        elif result_text.startswith("```"):
+            result_text = result_text[3:-3]
+            
+        ai_orders = json.loads(result_text)
+        
+        final_orders = []
+        for order in ai_orders:
+            for mi in menu_items:
+                if mi['food_name'] == order.get('food_name'):
+                    final_orders.append({
+                        'food_name': mi['food_name'],
+                        'price': float(mi['price']),
+                        'category': mi['category'],
+                        'id': mi['id'],
+                        'qty': int(order.get('qty', 1))
+                    })
+                    break
+        
+        return jsonify({'status': 'success', 'orders': final_orders})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

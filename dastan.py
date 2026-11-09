@@ -762,18 +762,33 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
     </div>
     <script>
         let curTable = '', tot = 0;
-        function openCh(tbl) {
+     function openCh(tbl) {
             curTable = tbl; document.getElementById('chTitle').innerText = tbl;
             fetch('/get_table_orders/' + encodeURIComponent(tbl)).then(r=>r.json()).then(items => {
                 let tbody = document.getElementById('chList'); tbody.innerHTML = ''; tot = 0;
+                
+                let aggregated = {};
                 items.forEach(it => {
+                    if (it.food_name.includes('───')) return; 
+                    
                     let q = parseFloat(it.quantity) || 0;
                     let p = parseFloat(it.price) || 0;
-                    let line = p * q;
-                    tot += line;
-                    tbody.innerHTML += `<tr><td style="text-align:right;">${it.food_name}</td><td>${q}</td><td>${p}</td><td>${line}</td></tr>`;
+                    let key = it.food_name + "_" + p; 
+                    
+                    if (!aggregated[key]) {
+                        aggregated[key] = { name: it.food_name, price: p, qty: 0 };
+                    }
+                    aggregated[key].qty += q; 
                 });
-                document.getElementById('lblTot').innerText = tot; document.getElementById('txtPaid').value = tot;
+
+                Object.values(aggregated).forEach(it => {
+                    let line = it.price * it.qty;
+                    tot += line;
+                    tbody.innerHTML += `<tr><td style="text-align:right;">${it.name}</td><td>${it.qty}</td><td>${it.price}</td><td>${line}</td></tr>`;
+                });
+
+                document.getElementById('lblTot').innerText = tot; 
+                document.getElementById('txtPaid').value = tot;
                 calcChange(); document.getElementById('chModal').style.display = 'flex';
             });
         }
@@ -2175,17 +2190,24 @@ def admin_complete_payment():
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT food_name, quantity, price FROM froshtn WHERE table_cabin = %s", (t_num,))
+            cur.execute("""
+                SELECT food_name, SUM(quantity) as quantity, price 
+                FROM froshtn 
+                WHERE table_cabin = %s AND food_name NOT LIKE '%%───%%'
+                GROUP BY food_name, price
+            """, (t_num,))
             items = cur.fetchall()
+            
             p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cur.execute("INSERT INTO qasa (transaction_time, place_id, amount, discount) VALUES (%s, %s, %s, %s)", (current_time, p_id, paid, disc))
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s OR table_cabin LIKE %s", (t_num, f"{t_num} [%"))
         conn.commit()
         return jsonify({'status': 'success', 'receipt': {'table': t_num, 'items': items, 'total': tot, 'paid': paid}})
-    except Exception as e: return jsonify({'status': 'error', 'message': str(e)})
-    finally: conn.close()
-
+    except Exception as e: 
+        return jsonify({'status': 'error', 'message': str(e)})
+    finally: 
+        if conn: conn.close()
 @app.route('/admin/qasa')
 def admin_qasa():
     if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))

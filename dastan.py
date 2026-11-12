@@ -934,7 +934,6 @@ WEB_QASA_TEMPLATE = COMMON_HEAD + """
 </html>
 """
 
-# ----------------- Menu Manager -----------------
 WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
 <html lang="ckb" dir="rtl">
@@ -968,8 +967,7 @@ WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
             <input list="cats" name="category" class="c-input" placeholder="پۆلێن" required style="flex:1; margin:0;"><datalist id="cats">{% for c in existing_categories %}<option value="{{ c }}">{% endfor %}</datalist>
             
             <div style="flex:2; display:flex; gap:5px; margin:0;">
-                <input type="text" name="image_path_link" class="c-input" placeholder="لینکی وێنە (ئارەزوومەندانە)" style="margin:0;">
-                <input type="file" name="food_image" class="c-input" style="margin:0; padding:7px;">
+                <input type="file" name="food_image" class="c-input" style="margin:0; padding:7px;" accept="image/*">
             </div>
             
             <button type="submit" style="background:var(--accent); color:#000; padding:10px; border:none; border-radius:8px; font-weight:bold;">زیادکردن</button>
@@ -982,7 +980,7 @@ WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
             <div style="font-weight:bold; margin-bottom:5px;">{{ f.food_name }}</div>
             <div style="color:var(--primary); margin-bottom:10px; font-weight:bold;">{{ "{:,.0f}".format(f.price) }} د.ع</div>
             <div style="display:flex; gap:5px;">
-                <button style="flex:1; background:#3b82f6; color:#fff; border:none; padding:6px; border-radius:6px; cursor:pointer; font-weight:bold;" onclick="openEdit({{ f.id }}, '{{ f.food_name }}', '{{ f.food_name_ar }}', '{{ f.food_name_en }}', {{ f.price }}, '{{ f.category }}', '{{ f.image_path }}')">دەستکاری</button>
+                <button style="flex:1; background:#3b82f6; color:#fff; border:none; padding:6px; border-radius:6px; cursor:pointer; font-weight:bold;" onclick="openEdit({{ f.id }}, '{{ f.food_name }}', '{{ f.food_name_ar }}', '{{ f.food_name_en }}', {{ f.price }}, '{{ f.category }}')">دەستکاری</button>
                 <a href="/admin/delete_food/{{ f.id }}" style="flex:1; background:var(--danger); color:#fff; padding:6px; border-radius:6px; text-decoration:none; font-weight:bold;" onclick="return confirm('سڕینەوە؟')">سڕینەوە</a>
             </div>
         </div>
@@ -1002,9 +1000,8 @@ WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
                 <input list="edit_cats" id="e_cat" name="category" class="c-input" required>
                 <datalist id="edit_cats">{% for c in existing_categories %}<option value="{{ c }}">{% endfor %}</datalist>
                 
-                <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:5px;">وێنەی نوێ (لینک یان فایل)</label>
-                <input type="text" id="e_img_link" name="image_path_link" class="c-input" placeholder="لینکی وێنە (ئارەزوومەندانە)">
-                <input type="file" name="food_image" class="c-input" style="padding:7px;">
+                <label style="font-size:12px; color:#94a3b8; display:block; margin-bottom:5px;">وێنەی نوێ</label>
+                <input type="file" name="food_image" class="c-input" style="padding:7px;" accept="image/*">
                 
                 <button type="submit" style="background:var(--accent); color:#000; width:100%; padding:10px; border:none; border-radius:8px; font-weight:bold; margin-top:10px;">پاشەکەوتکردن</button>
                 <button type="button" style="background:transparent; border:1px solid var(--border); color:#fff; width:100%; padding:10px; border-radius:8px; font-weight:bold; margin-top:5px;" onclick="document.getElementById('editModal').style.display='none'">داخستن</button>
@@ -1012,21 +1009,19 @@ WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
         </div>
     </div>
     <script>
-        function openEdit(id, n, na, ne, p, c, imgUrl) {
+        function openEdit(id, n, na, ne, p, c) {
             document.getElementById('editForm').action = '/admin/edit_food/' + id;
             document.getElementById('e_name').value = n;
             document.getElementById('e_name_ar').value = na !== 'None' ? na : '';
             document.getElementById('e_name_en').value = ne !== 'None' ? ne : '';
             document.getElementById('e_price').value = p;
             document.getElementById('e_cat').value = c;
-            document.getElementById('e_img_link').value = (imgUrl && imgUrl.startsWith('http')) ? imgUrl : '';
             document.getElementById('editModal').style.display = 'flex';
         }
     </script>
 </body>
 </html>
 """
-
 # ----------------- QR Manager -----------------
 QR_MANAGER_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
@@ -2243,38 +2238,70 @@ def admin_add_food():
     name = request.form.get('food_name')
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
-    
-    # ڕێگریکردن لە کراش ئەگەر نرخی بەتاڵ بوو
     try:
         price = float(request.form.get('price', 0))
-    except ValueError:
+    except:
         price = 0
-        
     cat = request.form.get('category', 'گشتی')
-    img_link = request.form.get('image_path_link', '').strip()
     
-    img = img_link
+    img = ""
     if 'food_image' in request.files:
         f = request.files['food_image']
         if f and f.filename != '':
-            # خەزنکردنی وێنەکە لە فۆڵدەری سەلامەت لەجیاتی Base64
             filename = secure_filename(f.filename)
-            time_stamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            new_filename = f"{time_stamp}_{filename}"
-            f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
-            img = url_for('static', filename='uploads/' + new_filename)
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            new_filename = f"{timestamp}_{filename}"
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+            f.save(save_path)
+            # ڕێڕەوەکە زۆر کورتە بۆ ئەوەی لە MySQL کێشە دروست نەکات
+            img = f"/static/uploads/{new_filename}"
             
     conn = get_db()
     try:
-        with conn.cursor() as cur: 
+        with conn.cursor() as cur:
             cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
         conn.commit()
     except Exception as e:
-        print("Error adding food:", e)
-    finally: 
-        conn.close()
+        print("DB Add Error:", e)
+    finally:
+        if conn: conn.close()
     return redirect(url_for('admin_menu_manager'))
 
+@app.route('/admin/edit_food/<int:fid>', methods=['POST'])
+def admin_edit_food(fid):
+    name = request.form.get('food_name')
+    name_ar = request.form.get('food_name_ar', '')
+    name_en = request.form.get('food_name_en', '')
+    try:
+        price = float(request.form.get('price', 0))
+    except:
+        price = 0
+    cat = request.form.get('category', 'گشتی')
+    
+    final_img = None
+    if 'food_image' in request.files:
+        f = request.files['food_image']
+        if f and f.filename != '':
+            filename = secure_filename(f.filename)
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            new_filename = f"{timestamp}_{filename}"
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+            f.save(save_path)
+            final_img = f"/static/uploads/{new_filename}"
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            if final_img is not None:
+                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, name_ar, name_en, price, cat, final_img, fid))
+            else:
+                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s WHERE id=%s", (name, name_ar, name_en, price, cat, fid))
+        conn.commit()
+    except Exception as e:
+        print("DB Edit Error:", e)
+    finally:
+        if conn: conn.close()
+    return redirect(url_for('admin_menu_manager'))
 @app.route('/admin/edit_food/<int:fid>', methods=['POST'])
 def admin_edit_food(fid):
     name = request.form.get('food_name')

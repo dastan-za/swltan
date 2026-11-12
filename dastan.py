@@ -2264,25 +2264,24 @@ def admin_add_food():
     conn = get_db()
     try:
         with conn.cursor() as cur: 
-            # بە زۆر قەبارەی ستوونی وێنە گەورە دەکات بۆ ئەوەی جێگەی وێنەی مۆبایل ببێتەوە
             try: cur.execute("ALTER TABLE nse MODIFY COLUMN image_path LONGTEXT")
             except: pass
 
             try:
-                cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
+                # لێرەدا کێشەکەمان چارەسەرکرد، nsecol مان زیاد کردووە و نرخی '' مان پێداوە
+                cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path, nsecol) VALUES (%s, %s, %s, %s, %s, %s, '')", (name, name_ar, name_en, price, cat, img))
             except pymysql.err.OperationalError as e:
-                if e.args[0] == 1054: # ئەگەر ستوونەکانی کوردی و عەرەبی نەبوون
-                    cur.execute("INSERT INTO nse (food_name, price, category, image_path) VALUES (%s, %s, %s, %s)", (name, price, cat, img))
+                if e.args[0] == 1054: 
+                    # لێرەش nsecol مان زیاد کردووە
+                    cur.execute("INSERT INTO nse (food_name, price, category, image_path, nsecol) VALUES (%s, %s, %s, %s, '')", (name, price, cat, img))
                 else:
                     return f"<h1 style='color:red; text-align:center;'>ئێرۆری داتابەیس (OperationalError):</h1><p style='text-align:center; direction:ltr;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە</a></center>"
         conn.commit()
         return redirect(url_for('admin_menu_manager'))
     except Exception as e: 
-        # لێرەدا ئێرۆرەکە دەردەخەین لەبری ئەوەی بیشارینەوە
         return f"<h1 style='color:red; text-align:center;'>کێشەیەک هەیە لە خەزنکردن:</h1><p style='text-align:center; direction:ltr; font-weight:bold;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە بۆ مێنیو</a></center>"
     finally: 
         if conn: conn.close()
-
 @app.route('/admin/edit_food/<int:fid>', methods=['POST'])
 def admin_edit_food(fid):
     name = request.form.get('food_name')

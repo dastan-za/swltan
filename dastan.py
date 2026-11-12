@@ -2237,7 +2237,6 @@ def admin_menu_manager():
     except: pass
     finally: conn.close()
     return render_template_string(WEB_MENU_MANAGER_TEMPLATE, foods=foods, existing_categories=cats)
-
 @app.route('/admin/add_food', methods=['POST'])
 def admin_add_food():
     name = request.form.get('food_name')

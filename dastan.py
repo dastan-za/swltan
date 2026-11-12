@@ -2238,29 +2238,7 @@ def admin_menu_manager():
     finally: conn.close()
     return render_template_string(WEB_MENU_MANAGER_TEMPLATE, foods=foods, existing_categories=cats)
 
-@app.route('/admin/add_food', methods=['POST'])
-def admin_add_food():
-    name = request.form.get('food_name')
-    name_ar = request.form.get('food_name_ar', '')
-    name_en = request.form.get('food_name_en', '')
-    price = float(request.form.get('price', 0))
-    cat = request.form.get('category', 'گشتی')
-    img_link = request.form.get('image_path_link', '').strip()
-    
-    img = img_link
-    if 'food_image' in request.files:
-        f = request.files['food_image']
-        if f.filename != '':
-            img_b64 = base64.b64encode(f.read()).decode('utf-8')
-            img = f"data:{f.mimetype};base64,{img_b64}"
-            
-    conn = get_db()
-    try:
-        with conn.cursor() as cur: cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
-        conn.commit()
-    except: pass
-    finally: conn.close()
-    return redirect(url_for('admin_menu_manager'))
+@app.route('/admin/add_food', methods=['POST']) redirect(url_for('admin_menu_manager'))
 
 @app.route('/admin/edit_food/<int:fid>', methods=['POST'])
 def admin_edit_food(fid):

@@ -982,7 +982,8 @@ WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
             <div style="font-weight:bold; margin-bottom:5px;">{{ f.food_name }}</div>
             <div style="color:var(--primary); margin-bottom:10px; font-weight:bold;">{{ "{:,.0f}".format(f.price) }} د.ع</div>
             <div style="display:flex; gap:5px;">
-                <button style="flex:1; background:#3b82f6; color:#fff; border:none; padding:6px; border-radius:6px; cursor:pointer; font-weight:bold;" onclick="openEdit({{ f.id }}, '{{ f.food_name }}', '{{ f.food_name_ar }}', '{{ f.food_name_en }}', {{ f.price }}, '{{ f.category }}', '{{ f.image_path }}')">دەستکاری</button>
+                <!-- لێرەدا ڕێگریم کردووە لە تێکچوونی پەیجەکە بەهۆی گەورەیی Base64 -->
+                <button style="flex:1; background:#3b82f6; color:#fff; border:none; padding:6px; border-radius:6px; cursor:pointer; font-weight:bold;" onclick="openEdit({{ f.id }}, '{{ f.food_name }}', '{{ f.food_name_ar }}', '{{ f.food_name_en }}', {{ f.price }}, '{{ f.category }}', '{{ f.image_path if f.image_path and f.image_path.startswith(\'http\') else \'\' }}')">دەستکاری</button>
                 <a href="/admin/delete_food/{{ f.id }}" style="flex:1; background:var(--danger); color:#fff; padding:6px; border-radius:6px; text-decoration:none; font-weight:bold;" onclick="return confirm('سڕینەوە؟')">سڕینەوە</a>
             </div>
         </div>
@@ -1019,14 +1020,13 @@ WEB_MENU_MANAGER_TEMPLATE = COMMON_HEAD + """
             document.getElementById('e_name_en').value = ne !== 'None' ? ne : '';
             document.getElementById('e_price').value = p;
             document.getElementById('e_cat').value = c;
-            document.getElementById('e_img_link').value = (imgUrl && imgUrl.startsWith('http')) ? imgUrl : '';
+            document.getElementById('e_img_link').value = imgUrl;
             document.getElementById('editModal').style.display = 'flex';
         }
     </script>
 </body>
 </html>
 """
-
 # ----------------- QR Manager -----------------
 QR_MANAGER_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
@@ -2243,28 +2243,38 @@ def admin_add_food():
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
     
-    # چارەسەری کێشەی نرخ ئەگەر بەتاڵ بوو
-    price_val = request.form.get('price')
-    price = float(price_val) if price_val else 0.0
+    # چارەسەری ئێرۆری نرخ کاتێک بۆشە یان بەهەڵە داخڵ دەکرێت
+    price_val = request.form.get('price', '').replace(',', '').strip()
+    try:
+        price = float(price_val)
+    except:
+        price = 0.0
     
     cat = request.form.get('category', 'گشتی')
-    img_link = request.form.get('image_path_link', '').strip()
+    img = request.form.get('image_path_link', '').strip()
     
-    img = img_link
+    # گۆڕین بۆ Base64 بە شێوەیەکی پارێزراو
     if 'food_image' in request.files:
         f = request.files['food_image']
         if f and f.filename != '':
-            filename = secure_filename(f.filename)
-            # دروستکردنی ناوێکی بێهاوتا بۆ وێنەکە بۆ ئەوەی تێکەڵ نەبن
-            unique_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-            f.save(filepath) # خەزنکردنی وێنەکە لەناو سێرڤەر
-            img = f"/static/uploads/{unique_name}"
+            try:
+                img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                img = f"data:{f.mimetype};base64,{img_b64}"
+            except Exception as e:
+                print("Error reading file:", e)
 
     conn = get_db()
     try:
         with conn.cursor() as cur: 
-            cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
+            try:
+                # هەوڵدەدات بە ستوونە نوێیەکانەوە خەزنی بکات
+                cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
+            except pymysql.err.OperationalError as e:
+                # ئەگەر ستوونەکانی ar و en لە داتابەیسەکە بوونیان نەبوو، ڕێگە نادات کارەکە بوەستێت و بەبێ ئەوان خەزنی دەکات
+                if e.args[0] == 1054: 
+                    cur.execute("INSERT INTO nse (food_name, price, category, image_path) VALUES (%s, %s, %s, %s)", (name, price, cat, img))
+                else:
+                    raise e
         conn.commit()
     except Exception as e: 
         print("Error Adding Food:", e)
@@ -2278,37 +2288,51 @@ def admin_edit_food(fid):
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
     
-    price_val = request.form.get('price')
-    price = float(price_val) if price_val else 0.0
+    price_val = request.form.get('price', '').replace(',', '').strip()
+    try:
+        price = float(price_val)
+    except:
+        price = 0.0
     
     cat = request.form.get('category', 'گشتی')
     img_link = request.form.get('image_path_link', '').strip()
     
     final_img = None
-    if 'food_image' in request.files and request.files['food_image'].filename != '':
+    if 'food_image' in request.files:
         f = request.files['food_image']
-        filename = secure_filename(f.filename)
-        unique_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        f.save(filepath)
-        final_img = f"/static/uploads/{unique_name}"
-    elif img_link != '':
+        if f and f.filename != '':
+            try:
+                img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                final_img = f"data:{f.mimetype};base64,{img_b64}"
+            except Exception as e:
+                print("Error reading file:", e)
+    
+    # ئەگەر وێنەی نوێ دانەنرا، بەڵام لینکەکە دانرا
+    if not final_img and img_link != '':
         final_img = img_link
 
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            if final_img is not None:
-                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, name_ar, name_en, price, cat, final_img, fid))
-            else:
-                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s WHERE id=%s", (name, name_ar, name_en, price, cat, fid))
+            try:
+                if final_img is not None:
+                    cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, name_ar, name_en, price, cat, final_img, fid))
+                else:
+                    cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s WHERE id=%s", (name, name_ar, name_en, price, cat, fid))
+            except pymysql.err.OperationalError as e:
+                if e.args[0] == 1054: # ئەگەر ستوونەکانی ar و en بوونیان نەبوو
+                    if final_img is not None:
+                        cur.execute("UPDATE nse SET food_name=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, price, cat, final_img, fid))
+                    else:
+                        cur.execute("UPDATE nse SET food_name=%s, price=%s, category=%s WHERE id=%s", (name, price, cat, fid))
+                else:
+                    raise e
         conn.commit()
     except Exception as e: 
         print("Error Editing Food:", e)
     finally: 
         if conn: conn.close()
     return redirect(url_for('admin_menu_manager'))
-
 @app.route('/desktop/tables')
 def desktop_tables():
     if not session.get('authenticated'): return redirect(url_for('login'))

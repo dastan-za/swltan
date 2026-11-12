@@ -2243,17 +2243,15 @@ def admin_add_food():
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
     
-    # چارەسەری ئێرۆری نرخ کاتێک بۆشە یان بەهەڵە داخڵ دەکرێت
-    price_val = request.form.get('price', '').replace(',', '').strip()
     try:
-        price = float(price_val)
+        price = float(request.form.get('price', '').replace(',', '').strip())
     except:
         price = 0.0
     
     cat = request.form.get('category', 'گشتی')
-    img = request.form.get('image_path_link', '').strip()
+    img_link = request.form.get('image_path_link', '').strip()
     
-    # گۆڕین بۆ Base64 بە شێوەیەکی پارێزراو
+    img = img_link
     if 'food_image' in request.files:
         f = request.files['food_image']
         if f and f.filename != '':
@@ -2261,26 +2259,29 @@ def admin_add_food():
                 img_b64 = base64.b64encode(f.read()).decode('utf-8')
                 img = f"data:{f.mimetype};base64,{img_b64}"
             except Exception as e:
-                print("Error reading file:", e)
+                return f"<h1 style='color:red;'>هەڵە لە وێنەکەدا هەیە:</h1><p>{str(e)}</p>"
 
     conn = get_db()
     try:
         with conn.cursor() as cur: 
+            # بە زۆر قەبارەی ستوونی وێنە گەورە دەکات بۆ ئەوەی جێگەی وێنەی مۆبایل ببێتەوە
+            try: cur.execute("ALTER TABLE nse MODIFY COLUMN image_path LONGTEXT")
+            except: pass
+
             try:
-                # هەوڵدەدات بە ستوونە نوێیەکانەوە خەزنی بکات
                 cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
             except pymysql.err.OperationalError as e:
-                # ئەگەر ستوونەکانی ar و en لە داتابەیسەکە بوونیان نەبوو، ڕێگە نادات کارەکە بوەستێت و بەبێ ئەوان خەزنی دەکات
-                if e.args[0] == 1054: 
+                if e.args[0] == 1054: # ئەگەر ستوونەکانی کوردی و عەرەبی نەبوون
                     cur.execute("INSERT INTO nse (food_name, price, category, image_path) VALUES (%s, %s, %s, %s)", (name, price, cat, img))
                 else:
-                    raise e
+                    return f"<h1 style='color:red; text-align:center;'>ئێرۆری داتابەیس (OperationalError):</h1><p style='text-align:center; direction:ltr;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە</a></center>"
         conn.commit()
+        return redirect(url_for('admin_menu_manager'))
     except Exception as e: 
-        print("Error Adding Food:", e)
+        # لێرەدا ئێرۆرەکە دەردەخەین لەبری ئەوەی بیشارینەوە
+        return f"<h1 style='color:red; text-align:center;'>کێشەیەک هەیە لە خەزنکردن:</h1><p style='text-align:center; direction:ltr; font-weight:bold;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە بۆ مێنیو</a></center>"
     finally: 
         if conn: conn.close()
-    return redirect(url_for('admin_menu_manager'))
 
 @app.route('/admin/edit_food/<int:fid>', methods=['POST'])
 def admin_edit_food(fid):
@@ -2288,9 +2289,8 @@ def admin_edit_food(fid):
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
     
-    price_val = request.form.get('price', '').replace(',', '').strip()
     try:
-        price = float(price_val)
+        price = float(request.form.get('price', '').replace(',', '').strip())
     except:
         price = 0.0
     
@@ -2305,34 +2305,36 @@ def admin_edit_food(fid):
                 img_b64 = base64.b64encode(f.read()).decode('utf-8')
                 final_img = f"data:{f.mimetype};base64,{img_b64}"
             except Exception as e:
-                print("Error reading file:", e)
+                return f"<h1 style='color:red;'>هەڵە لە وێنەکەدا هەیە:</h1><p>{str(e)}</p>"
     
-    # ئەگەر وێنەی نوێ دانەنرا، بەڵام لینکەکە دانرا
     if not final_img and img_link != '':
         final_img = img_link
 
     conn = get_db()
     try:
         with conn.cursor() as cur:
+            try: cur.execute("ALTER TABLE nse MODIFY COLUMN image_path LONGTEXT")
+            except: pass
+
             try:
                 if final_img is not None:
                     cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, name_ar, name_en, price, cat, final_img, fid))
                 else:
                     cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s WHERE id=%s", (name, name_ar, name_en, price, cat, fid))
             except pymysql.err.OperationalError as e:
-                if e.args[0] == 1054: # ئەگەر ستوونەکانی ar و en بوونیان نەبوو
+                if e.args[0] == 1054: 
                     if final_img is not None:
                         cur.execute("UPDATE nse SET food_name=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, price, cat, final_img, fid))
                     else:
                         cur.execute("UPDATE nse SET food_name=%s, price=%s, category=%s WHERE id=%s", (name, price, cat, fid))
                 else:
-                    raise e
+                    return f"<h1 style='color:red; text-align:center;'>ئێرۆری داتابەیس (OperationalError):</h1><p style='text-align:center; direction:ltr;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە</a></center>"
         conn.commit()
+        return redirect(url_for('admin_menu_manager'))
     except Exception as e: 
-        print("Error Editing Food:", e)
+        return f"<h1 style='color:red; text-align:center;'>کێشەیەک هەیە لە گۆڕین:</h1><p style='text-align:center; direction:ltr; font-weight:bold;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە بۆ مێنیو</a></center>"
     finally: 
         if conn: conn.close()
-    return redirect(url_for('admin_menu_manager'))
 @app.route('/desktop/tables')
 def desktop_tables():
     if not session.get('authenticated'): return redirect(url_for('login'))

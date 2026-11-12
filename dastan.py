@@ -2238,41 +2238,85 @@ def admin_menu_manager():
     finally: conn.close()
     return render_template_string(WEB_MENU_MANAGER_TEMPLATE, foods=foods, existing_categories=cats)
 
+import base64
+
 @app.route('/admin/add_food', methods=['POST'])
 def admin_add_food():
     name = request.form.get('food_name')
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
     
-    # ڕێگریکردن لە کراش ئەگەر نرخی بەتاڵ بوو
+    # پارێزگاری لە کێشەی بەتاڵی نرخ
     try:
         price = float(request.form.get('price', 0))
     except ValueError:
         price = 0
         
     cat = request.form.get('category', 'گشتی')
-    img_link = request.form.get('image_path_link', '').strip()
     
-    img = img_link
+    # بەشی لینک بە تەواوی لادرا
+    img = ""
     if 'food_image' in request.files:
         f = request.files['food_image']
         if f and f.filename != '':
-            # خەزنکردنی وێنەکە لە فۆڵدەری سەلامەت لەجیاتی Base64
-            filename = secure_filename(f.filename)
-            time_stamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            new_filename = f"{time_stamp}_{filename}"
-            f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
-            img = url_for('static', filename='uploads/' + new_filename)
-            
+            try:
+                # گۆڕینی وێنەکە بۆ Base64 بۆ ئەوەی لە Railway کێشە دروست نەکات
+                img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                img = f"data:{f.mimetype};base64,{img_b64}"
+            except Exception as e:
+                print("Error processing image:", e)
+                
     conn = get_db()
     try:
         with conn.cursor() as cur: 
             cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
         conn.commit()
     except Exception as e:
-        print("Error adding food:", e)
+        print("Error adding food to DB:", e)
     finally: 
-        conn.close()
+        if conn:
+            conn.close()
+            
+    return redirect(url_for('admin_menu_manager'))
+
+@app.route('/admin/edit_food/<int:fid>', methods=['POST'])
+def admin_edit_food(fid):
+    name = request.form.get('food_name')
+    name_ar = request.form.get('food_name_ar', '')
+    name_en = request.form.get('food_name_en', '')
+    
+    try:
+        price = float(request.form.get('price', 0))
+    except ValueError:
+        price = 0
+        
+    cat = request.form.get('category', 'گشتی')
+    
+    final_img = None
+    if 'food_image' in request.files:
+        f = request.files['food_image']
+        if f and f.filename != '':
+            try:
+                img_b64 = base64.b64encode(f.read()).decode('utf-8')
+                final_img = f"data:{f.mimetype};base64,{img_b64}"
+            except Exception as e:
+                print("Error processing image:", e)
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            # ئەگەر وێنەی نوێ دانرابوو، وێنەکەش نوێ بکەرەوە
+            if final_img is not None:
+                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s, image_path=%s WHERE id=%s", (name, name_ar, name_en, price, cat, final_img, fid))
+            else:
+                cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s WHERE id=%s", (name, name_ar, name_en, price, cat, fid))
+        conn.commit()
+    except Exception as e:
+        print("Error editing food in DB:", e)
+    finally: 
+        if conn:
+            conn.close()
+            
     return redirect(url_for('admin_menu_manager'))
 
 @app.route('/admin/edit_food/<int:fid>', methods=['POST'])

@@ -2243,23 +2243,36 @@ def admin_add_food():
     name = request.form.get('food_name')
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
-    price = float(request.form.get('price', 0))
+    
+    # ڕێگریکردن لە کراش ئەگەر نرخی بەتاڵ بوو
+    try:
+        price = float(request.form.get('price', 0))
+    except ValueError:
+        price = 0
+        
     cat = request.form.get('category', 'گشتی')
     img_link = request.form.get('image_path_link', '').strip()
     
     img = img_link
     if 'food_image' in request.files:
         f = request.files['food_image']
-        if f.filename != '':
-            img_b64 = base64.b64encode(f.read()).decode('utf-8')
-            img = f"data:{f.mimetype};base64,{img_b64}"
+        if f and f.filename != '':
+            # خەزنکردنی وێنەکە لە فۆڵدەری سەلامەت لەجیاتی Base64
+            filename = secure_filename(f.filename)
+            time_stamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            new_filename = f"{time_stamp}_{filename}"
+            f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
+            img = url_for('static', filename='uploads/' + new_filename)
             
     conn = get_db()
     try:
-        with conn.cursor() as cur: cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
+        with conn.cursor() as cur: 
+            cur.execute("INSERT INTO nse (food_name, food_name_ar, food_name_en, price, category, image_path) VALUES (%s, %s, %s, %s, %s, %s)", (name, name_ar, name_en, price, cat, img))
         conn.commit()
-    except: pass
-    finally: conn.close()
+    except Exception as e:
+        print("Error adding food:", e)
+    finally: 
+        conn.close()
     return redirect(url_for('admin_menu_manager'))
 
 @app.route('/admin/edit_food/<int:fid>', methods=['POST'])
@@ -2267,16 +2280,26 @@ def admin_edit_food(fid):
     name = request.form.get('food_name')
     name_ar = request.form.get('food_name_ar', '')
     name_en = request.form.get('food_name_en', '')
-    price = float(request.form.get('price', 0))
+    
+    try:
+        price = float(request.form.get('price', 0))
+    except ValueError:
+        price = 0
+        
     cat = request.form.get('category', 'گشتی')
     img_link = request.form.get('image_path_link', '').strip()
     
     final_img = None
-    if 'food_image' in request.files and request.files['food_image'].filename != '':
+    if 'food_image' in request.files:
         f = request.files['food_image']
-        img_b64 = base64.b64encode(f.read()).decode('utf-8')
-        final_img = f"data:{f.mimetype};base64,{img_b64}"
-    elif img_link != '':
+        if f and f.filename != '':
+            filename = secure_filename(f.filename)
+            time_stamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            new_filename = f"{time_stamp}_{filename}"
+            f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
+            final_img = url_for('static', filename='uploads/' + new_filename)
+            
+    if not final_img and img_link != '':
         final_img = img_link
 
     conn = get_db()
@@ -2287,10 +2310,11 @@ def admin_edit_food(fid):
             else:
                 cur.execute("UPDATE nse SET food_name=%s, food_name_ar=%s, food_name_en=%s, price=%s, category=%s WHERE id=%s", (name, name_ar, name_en, price, cat, fid))
         conn.commit()
-    except: pass
-    finally: conn.close()
+    except Exception as e:
+        print("Error editing food:", e)
+    finally: 
+        conn.close()
     return redirect(url_for('admin_menu_manager'))
-
 @app.route('/admin/delete_food/<int:fid>')
 def admin_delete_food(fid):
     conn = get_db()

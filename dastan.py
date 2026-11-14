@@ -769,8 +769,7 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
                 
                 let aggregated = {};
                 items.forEach(it => {
-                    // لێرەدا فلتەرەکەمان زیادکرد بۆ هەردوو جۆرەکەی هێڵ بۆ ئەوەی نیشانی نەدات
-                    if (it.food_name.includes('───') || it.food_name.includes('---')) return; 
+                    if (it.food_name.includes('───')) return; 
                     
                     let q = parseFloat(it.quantity) || 0;
                     let p = parseFloat(it.price) || 0;
@@ -2180,6 +2179,7 @@ def admin_cashier():
     except: pass
     finally: conn.close()
     return render_template_string(WEB_CASHIER_TEMPLATE, active_tables=active_tables)
+
 @app.route('/admin/complete_payment', methods=['POST'])
 def admin_complete_payment():
     data = request.get_json() or {}
@@ -2193,7 +2193,7 @@ def admin_complete_payment():
             cur.execute("""
                 SELECT food_name, SUM(quantity) as quantity, price 
                 FROM froshtn 
-                WHERE table_cabin = %s AND food_name NOT LIKE '%%───%%' AND food_name NOT LIKE '%%---%%'
+                WHERE table_cabin = %s AND food_name NOT LIKE '%%───%%'
                 GROUP BY food_name, price
             """, (t_num,))
             items = cur.fetchall()
@@ -2473,14 +2473,10 @@ def save_cart_order():
                 fname = str(it.get('ku') or it.get('full_name') or it.get('food_name') or '')
                 is_div = it.get('is_divider') or 'قاپی نوێ' in fname or '───' in fname or '---' in fname
                 final_name = "-----------------" if is_div else fname
-                
-                # لێرەدا بڕی هێڵەکانمان کرد بە سفر (0)
-                qty = 0 if is_div else float(it.get('qty', 1))
-
                 cur.execute("""
                     INSERT INTO froshtn (table_cabin, food_name, quantity, price, category, created_at, is_printed) 
                     VALUES (%s, %s, %s, %s, %s, NOW(), 1)
-                """, (tbl, final_name, qty, float(it.get('price', 0)), it.get('cat', 'گشتی')))
+                """, (tbl, final_name, float(it.get('qty', 1)), float(it.get('price', 0)), it.get('cat', 'گشتی')))
 
             # ئامادەکردنی لیستی مەتبەخ بۆ پرێنتکردن (is_printed = 0)
             kitchen_inserts = []
@@ -2502,7 +2498,7 @@ def save_cart_order():
                         if plate_idx > 1 and not current_plate_printed:
                             kitchen_inserts.append({
                                 'name': '-----------------', 
-                                'qty': 0,  # لێرەش بڕی هێڵمان کرد بە سفر
+                                'qty': 1, 
                                 'price': 0, 
                                 'cat': it.get('cat', 'برژاو'), 
                                 'action': 'add'

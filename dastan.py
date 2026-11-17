@@ -59,6 +59,7 @@ def ensure_all_tables():
             except: pass
 
             cursor.execute("""CREATE TABLE IF NOT EXISTS froshtn (order_id INT AUTO_INCREMENT PRIMARY KEY, quantity DECIMAL(10, 3) DEFAULT 1, food_name VARCHAR(255), price DECIMAL(18, 0), category VARCHAR(150), table_cabin VARCHAR(150), notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status VARCHAR(50) DEFAULT 'Active', is_printed TINYINT DEFAULT 0);""")
+            cursor.execute("""CREATE TABLE IF NOT EXISTS froshtn_history (id INT AUTO_INCREMENT PRIMARY KEY, quantity DECIMAL(10, 3) DEFAULT 1, food_name VARCHAR(255), price DECIMAL(18, 0), category VARCHAR(150), table_cabin VARCHAR(150), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);""")
             try: cursor.execute("ALTER TABLE froshtn ADD COLUMN is_printed TINYINT DEFAULT 0;")
             except: pass
 
@@ -339,8 +340,7 @@ WEB_AMAR_TEMPLATE = COMMON_HEAD + """
         .top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 14px 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
         .btn-dash { background: var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; }
         .filter-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 20px; display:flex; gap:10px; }
-        .date-input { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: #fff; outline: none; }
-        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.date-input { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: #fff; outline: none; color-scheme: dark; font-family: inherit; cursor: pointer; }        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
         .sum-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; text-align: center; }
         .sum-val { font-size: 20px; font-weight: 900; margin-top:5px; }
         table { width: 100%; border-collapse: collapse; text-align: center; background: var(--card); border: 1px solid var(--border); }
@@ -795,13 +795,24 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
         }
         function adj(v) { let p = parseInt(document.getElementById('txtPaid').value)||0; document.getElementById('txtPaid').value = Math.max(0, p+v); calcChange(); }
         function calcChange() { let d = (parseInt(document.getElementById('txtPaid').value)||0) - tot; document.getElementById('lblChange').innerText = d; document.getElementById('lblChange').style.color = d>=0?'var(--accent)':'var(--danger)'; }
-        function pay() {
+function pay() {
             let p = parseInt(document.getElementById('txtPaid').value)||0;
             if(p<=0) return alert('بڕی پارە هەڵەیە');
+            
+            let btn = document.querySelector('.btn-pay');
+            btn.disabled = true;
+            btn.innerText = 'چاوەڕێ بە...';
+            
             fetch('/admin/complete_payment', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({table_number:curTable, amount_paid:p, total_amount:tot})})
-            .then(r=>r.json()).then(res=>{ if(res.status==='success'){ printR(res.receipt); } else alert(res.message); });
-        }
-      function printR(d) {
+            .then(r=>r.json()).then(res=>{ 
+                btn.disabled = false;
+                btn.innerText = 'واصڵکردن و چاپ';
+                if(res.status==='success'){ printR(res.receipt); } else alert(res.message); 
+            }).catch(e => {
+                btn.disabled = false;
+                btn.innerText = 'واصڵکردن و چاپ';
+            });
+        }      function printR(d) {
             let win = window.open('','_blank','width=400,height=600');
             let h = `<!DOCTYPE html><html dir="rtl"><head>
             <meta charset="utf-8">
@@ -1959,7 +1970,12 @@ def admin_amar():
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT food_name, quantity, price FROM froshtn WHERE DATE(created_at) >= %s AND DATE(created_at) <= %s AND food_name NOT LIKE '%%قاپی نوێ%%'", (start_date, end_date))
+            # 1. هێنانی کۆی فرۆش لە قاسە (بۆ ئەوەی پارەی واقیعی پیشان بدات بە دروستی)
+            cur.execute("SELECT IFNULL(SUM(amount), 0) AS s FROM qasa WHERE DATE(transaction_time) >= %s AND DATE(transaction_time) <= %s", (start_date, end_date))
+            total_sales = float(cur.fetchone()['s'])
+            
+            # 2. هێنانی لیستی خواردنە فرۆشراوەکان لە خشتەی مێژوو
+            cur.execute("SELECT food_name, quantity, price FROM froshtn_history WHERE DATE(created_at) >= %s AND DATE(created_at) <= %s AND food_name NOT LIKE '%%───%%' AND food_name NOT LIKE '%%---%%'", (start_date, end_date))
             raw_data = cur.fetchall()
             aggregated = {}
             for item in raw_data:
@@ -1969,20 +1985,21 @@ def admin_amar():
                 aggregated[clean_name]['qty'] += qty
                 aggregated[clean_name]['total'] += (qty * price)
             report_rows = sorted(list(aggregated.values()), key=lambda x: x['qty'], reverse=True)
-            total_sales = sum(r['total'] for r in report_rows)
+            
             try:
                 cur.execute("SELECT IFNULL(SUM(amount), 0) AS e FROM masrwf WHERE DATE(masrwf_date) >= %s AND DATE(masrwf_date) <= %s", (start_date, end_date))
                 total_expenses = float(cur.fetchone()['e'])
             except: pass
+            
             try:
                 cur.execute("SELECT IFNULL(SUM((CASE WHEN wa.status = 'هاتوو' THEN w.salary WHEN wa.status = 'نیوو شەفت' THEN w.salary / 2 ELSE 0 END) + IFNULL(wa.bonus, 0)), 0) AS w_due FROM workers w INNER JOIN worker_attendance wa ON w.id = wa.worker_id WHERE wa.date >= %s AND wa.date <= %s", (start_date, end_date))
                 total_workers_wage = float(cur.fetchone()['w_due'])
             except: pass
     except: pass
     finally: conn.close()
+    
     net_profit = total_sales - (total_expenses + total_workers_wage)
     return render_template_string(WEB_AMAR_TEMPLATE, start_date=start_date, end_date=end_date, report_rows=report_rows, total_sales=total_sales, total_expenses=total_expenses, total_workers_wage=total_workers_wage, net_profit=net_profit)
-
 @app.route('/admin/masrwf')
 def admin_masrwf():
     if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
@@ -2198,9 +2215,20 @@ def admin_complete_payment():
             """, (t_num,))
             items = cur.fetchall()
             
-            p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
+            if not items:
+                return jsonify({'status': 'error', 'message': 'ئەم مێزە پێشتر واصڵ کراوە یان بەتاڵە!'})
+            
+p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cur.execute("INSERT INTO qasa (transaction_time, place_id, amount, discount) VALUES (%s, %s, %s, %s)", (current_time, p_id, paid, disc))
+            
+            # خەزنکردنی مێژووی خواردنەکان پێش ئەوەی مێزەکە بەتاڵ بکرێتەوە
+            cur.execute("""
+                INSERT INTO froshtn_history (food_name, quantity, price, category, table_cabin, created_at)
+                SELECT food_name, quantity, price, category, table_cabin, %s
+                FROM froshtn WHERE (table_cabin = %s OR table_cabin LIKE %s) AND food_name NOT LIKE '%%───%%' AND food_name NOT LIKE '%%---%%'
+            """, (current_time, t_num, f"{t_num} [%"))
+            
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s OR table_cabin LIKE %s", (t_num, f"{t_num} [%"))
         conn.commit()
         return jsonify({'status': 'success', 'receipt': {'table': t_num, 'items': items, 'total': tot, 'paid': paid}})

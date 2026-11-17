@@ -812,7 +812,8 @@ function pay() {
                 btn.disabled = false;
                 btn.innerText = 'واصڵکردن و چاپ';
             });
-        }      function printR(d) {
+        }    
+        function printR(d) {
             let win = window.open('','_blank','width=400,height=600');
             let h = `<!DOCTYPE html><html dir="rtl"><head>
             <meta charset="utf-8">
@@ -2218,7 +2219,7 @@ def admin_complete_payment():
             if not items:
                 return jsonify({'status': 'error', 'message': 'ئەم مێزە پێشتر واصڵ کراوە یان بەتاڵە!'})
             
-p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
+            p_id = t_num if ('سەفەری' in t_num or t_num.startswith('m')) else f"m{t_num}"
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cur.execute("INSERT INTO qasa (transaction_time, place_id, amount, discount) VALUES (%s, %s, %s, %s)", (current_time, p_id, paid, disc))
             

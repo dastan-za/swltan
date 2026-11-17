@@ -24,7 +24,7 @@ DB_CONFIG = {
     'port': 31707,
     'user': 'root',
     'password': 'HITVDFaMFehpQFmWrZlnaTKtavNtBZyw',
-    'database': 'railway',
+    'database': 'nrx',
     'charset': 'utf8mb4',
     'connect_timeout': 10,
     'cursorclass': pymysql.cursors.DictCursor

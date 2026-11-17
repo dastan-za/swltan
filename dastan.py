@@ -1055,7 +1055,7 @@ QR_MANAGER_TEMPLATE = COMMON_HEAD + """
         .qr-card { background: #fff; color: #000; border-radius: 12px; padding: 15px; text-align: center; }
         .qr-card img { width: 120px; height: 120px; margin: 10px 0; }
         .btn-toggle { width: 100%; padding: 6px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; font-size: 11px; }
-        @media print { body{background:#fff; color:#000; padding:0;} .top-bar, .btn-toggle {display:none;} .qr-grid{grid-template-columns: repeat(4, 1fr); gap:10px;} .qr-card{border:1px solid #000;} }
+        @media print { body{background:#fff; color:#000; padding:0;} .top-bar, .btn-toggle {display:none;} .qr-grid{grid-template-columns: repeat(4, 1fr); gap:10px;} .qr-card{border:1px solid #000; page-break-inside: avoid; break-inside: avoid;} }
     </style>
 </head>
 <body>

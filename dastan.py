@@ -95,15 +95,23 @@ ensure_all_tables()
 @app.before_request
 def enforce_security():
     endpoint = request.endpoint or ''
-    exempt_endpoints = ['login', 'customer_table_view', 'save_customer_order', 'static', 'index']
+    exempt_endpoints = ['login', 'logout', 'customer_table_view', 'save_customer_order', 'static', 'index']
     if endpoint in exempt_endpoints or request.path.startswith(('/get_', '/save_', '/clear_', '/change_', '/set_', '/toggle_', '/api_')):
         return
     if not session.get('authenticated'):
         return redirect(url_for('login'))
-    if request.path.startswith('/admin') and session.get('role') != 'admin':
+    
+    role = session.get('role')
+    # ئەگەر کاشێر بوو، تەنها ڕێگەی پێبدرێت بچێتە شاشەی کاشێر و واصڵکردن
+    if role == 'cashier':
+        if request.path not in ['/admin/cashier', '/admin/complete_payment']:
+            return redirect(url_for('admin_cashier'))
+        return
+        
+    # هەر کەسێکی تر جگە لە بەڕێوەبەر (admin) نەتوانێت بچێتە بەشەکانی ئەدمین و بارکۆد
+    if (request.path.startswith('/admin') or request.path.startswith('/qr_manager')) and role != 'admin':
         session.clear()
         return redirect(url_for('login'))
-
 # ==========================================
 # 4. بەشی دیزاینی هاوبەش (Common HTML/CSS/JS)
 # ==========================================
@@ -728,7 +736,11 @@ WEB_CASHIER_TEMPLATE = COMMON_HEAD + """
 <body>
     <div class="header">
         <h2 style="color:var(--accent); font-size:18px;" data-tr="cashier">🛎️ کاشێر</h2>
-        <a href="/admin" class="btn-dash" data-tr="dashboard">داشبۆرد</a>
+    {% if session.get('role') == 'admin' %}
+            <a href="/admin" class="btn-dash" data-tr="dashboard">داشبۆرد</a>
+        {% else %}
+            <a href="/logout" class="btn-dash" style="background:var(--danger); color:#fff;" data-tr="logout">✕ دەرچوون</a>
+        {% endif %}
     </div>
     <div class="tables-grid" id="tablesGrid">
         {% for t in active_tables %}
@@ -1922,7 +1934,7 @@ def login():
             role = user_row.get('role', 'Waiter')
             if role in ['Manager', 'Admin', 'admin']: session['role'] = 'admin'; return redirect(url_for('admin_dashboard'))
             elif role == 'Mobile_Waiter': session['role'] = 'mobile_waiter'; return redirect(url_for('mobile_waiter_tables'))
-            elif role == 'Cashier': session['role'] = 'admin'; return redirect(url_for('admin_cashier'))
+            elif role == 'Cashier': session['role'] = 'cashier'; return redirect(url_for('admin_cashier'))
             else: session['role'] = 'waiter'; return redirect(url_for('desktop_tables'))
 
         if pwd in ['99', '٩٩', '222', '٢٢٢']:
@@ -2188,7 +2200,7 @@ def admin_delete_user(uid):
 
 @app.route('/admin/cashier')
 def admin_cashier():
-    if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
+    if not session.get('authenticated') or session.get('role') not in ['admin', 'cashier']: return redirect(url_for('login'))
     active_tables = []
     conn = get_db()
     try:

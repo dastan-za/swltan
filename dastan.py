@@ -347,8 +347,9 @@ WEB_AMAR_TEMPLATE = COMMON_HEAD + """
         body { background: var(--bg); color: var(--text); padding: 20px; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 14px 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
         .btn-dash { background: var(--border); color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 800; }
-        .filter-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 20px; display:flex; gap:10px; }
-.date-input { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: #fff; outline: none; color-scheme: dark; font-family: inherit; cursor: pointer; }        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
+        .filter-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 20px; display:flex; gap:10px; align-items: center; flex-wrap: wrap; }
+        .date-input, .select-input { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: #fff; outline: none; color-scheme: dark; font-family: inherit; cursor: pointer; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px; }
         .sum-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; text-align: center; }
         .sum-val { font-size: 20px; font-weight: 900; margin-top:5px; }
         table { width: 100%; border-collapse: collapse; text-align: center; background: var(--card); border: 1px solid var(--border); }
@@ -361,29 +362,39 @@ WEB_AMAR_TEMPLATE = COMMON_HEAD + """
         <h2 style="color:var(--primary); font-size: 18px;" data-tr="reports">📊 ڕاپۆرتی ئامار و قازانج</h2>
         <a href="/admin" class="btn-dash" data-tr="dashboard">⬅ داشبۆرد</a>
     </div>
+    
     <form method="GET" action="/admin/amar" class="filter-card">
+        <select name="category" class="select-input">
+            <option value="all">هەموو جۆرەکان (پۆلێن)</option>
+            {% for cat in existing_categories %}
+            <option value="{{ cat }}" {{ 'selected' if selected_cat == cat else '' }}>{{ cat }}</option>
+            {% endfor %}
+        </select>
         <input type="date" name="start_date" class="date-input" value="{{ start_date }}" required>
         <input type="date" name="end_date" class="date-input" value="{{ end_date }}" required>
-        <button type="submit" style="background:var(--accent); color:#000; border:none; padding:10px 20px; border-radius:8px; font-weight:bold;">فلتەر</button>
+        <button type="submit" style="background:var(--accent); color:#000; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">فلتەر</button>
     </form>
+    
     <div class="summary-grid">
         <div class="sum-card"><div>کۆی فرۆش</div><div class="sum-val" style="color: var(--accent);">{{ "{:,.0f}".format(total_sales) }}</div></div>
         <div class="sum-card"><div>کۆی مەسرووف</div><div class="sum-val" style="color: var(--danger);">{{ "{:,.0f}".format(total_expenses) }}</div></div>
         <div class="sum-card"><div>کرێی شاگرد</div><div class="sum-val" style="color: #3b82f6;">{{ "{:,.0f}".format(total_workers_wage) }}</div></div>
         <div class="sum-card"><div>قازانجی سافی</div><div class="sum-val" style="color: {{ 'var(--accent)' if net_profit >= 0 else 'var(--danger)' }};">{{ "{:,.0f}".format(net_profit) }}</div></div>
     </div>
+    
     <table>
         <thead><tr><th>ناوی خواردن</th><th>ژمارە</th><th>کۆی داهات</th></tr></thead>
         <tbody>
             {% for r in report_rows %}
             <tr><td>{{ r.food_name }}</td><td>{{ "{:,.2f}".format(r.qty).rstrip('0').rstrip('.') }}</td><td style="color:var(--accent); font-weight:bold;">{{ "{:,.0f}".format(r.total) }}</td></tr>
+            {% else %}
+            <tr><td colspan="3" style="padding:20px;">هیچ زانیارییەک نییە لەم بەدواوە</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </body>
 </html>
 """
-
 # ----------------- Masrwfat -----------------
 WEB_MASRWF_TEMPLATE = COMMON_HEAD + """
 <!DOCTYPE html>
@@ -1979,24 +1990,42 @@ def admin_amar():
     today = datetime.now()
     start_date = request.args.get('start_date', today.replace(day=1).strftime('%Y-%m-%d'))
     end_date = request.args.get('end_date', today.strftime('%Y-%m-%d'))
+    selected_cat = request.args.get('category', 'all')
+    
     report_rows, total_sales, total_expenses, total_workers_wage = [], 0.0, 0.0, 0.0
+    existing_categories = []
+    
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            # 1. هێنانی کۆی فرۆش لە قاسە (بۆ ئەوەی پارەی واقیعی پیشان بدات بە دروستی)
+            # هێنانی پۆلێنەکان بۆ ناو کۆمبۆبۆکسەکە
+            cur.execute("SELECT DISTINCT category FROM nse WHERE category IS NOT NULL AND category != ''")
+            existing_categories = [r['category'] for r in cur.fetchall()]
+
+            # هێنانی کۆی فرۆش لە قاسە
             cur.execute("SELECT IFNULL(SUM(amount), 0) AS s FROM qasa WHERE DATE(transaction_time) >= %s AND DATE(transaction_time) <= %s", (start_date, end_date))
             total_sales = float(cur.fetchone()['s'])
             
-            # 2. هێنانی لیستی خواردنە فرۆشراوەکان لە خشتەی مێژوو
-            cur.execute("SELECT food_name, quantity, price FROM froshtn_history WHERE DATE(created_at) >= %s AND DATE(created_at) <= %s AND food_name NOT LIKE '%%───%%' AND food_name NOT LIKE '%%---%%'", (start_date, end_date))
+            # هێنانی لیستی خواردنە فرۆشراوەکان لەگەڵ پۆلێنەکانیان
+            cur.execute("SELECT food_name, quantity, price, category FROM froshtn_history WHERE DATE(created_at) >= %s AND DATE(created_at) <= %s AND food_name NOT LIKE '%%───%%' AND food_name NOT LIKE '%%---%%'", (start_date, end_date))
             raw_data = cur.fetchall()
+            
             aggregated = {}
             for item in raw_data:
                 clean_name = re.sub(r'^[+\s]+|[+\s]+$', '', str(item.get('food_name') or '')).replace('+', '').strip()
-                qty = float(item.get('quantity') or 1); price = float(item.get('price') or 0)
-                if clean_name not in aggregated: aggregated[clean_name] = {'food_name': clean_name, 'qty': 0, 'price': price, 'total': 0.0}
+                qty = float(item.get('quantity') or 1)
+                price = float(item.get('price') or 0)
+                cat = item.get('category') or 'گشتی'
+                
+                # ئەگەر فلتەری پۆلێن هەڵبژێردرابێت و جیاواز بێت لە 'all'
+                if selected_cat != 'all' and cat != selected_cat:
+                    continue
+                
+                if clean_name not in aggregated: 
+                    aggregated[clean_name] = {'food_name': clean_name, 'qty': 0, 'price': price, 'total': 0.0}
                 aggregated[clean_name]['qty'] += qty
                 aggregated[clean_name]['total'] += (qty * price)
+                
             report_rows = sorted(list(aggregated.values()), key=lambda x: x['qty'], reverse=True)
             
             try:
@@ -2012,7 +2041,7 @@ def admin_amar():
     finally: conn.close()
     
     net_profit = total_sales - (total_expenses + total_workers_wage)
-    return render_template_string(WEB_AMAR_TEMPLATE, start_date=start_date, end_date=end_date, report_rows=report_rows, total_sales=total_sales, total_expenses=total_expenses, total_workers_wage=total_workers_wage, net_profit=net_profit)
+    return render_template_string(WEB_AMAR_TEMPLATE, start_date=start_date, end_date=end_date, report_rows=report_rows, total_sales=total_sales, total_expenses=total_expenses, total_workers_wage=total_workers_wage, net_profit=net_profit, existing_categories=existing_categories, selected_cat=selected_cat)
 @app.route('/admin/masrwf')
 def admin_masrwf():
     if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
@@ -2375,7 +2404,7 @@ def admin_edit_food(fid):
         return f"<h1 style='color:red; text-align:center;'>کێشەیەک هەیە لە گۆڕین:</h1><p style='text-align:center; direction:ltr; font-weight:bold;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە بۆ مێنیو</a></center>"
     finally: 
         if conn: conn.close()
-            @app.route('/admin/delete_food/<int:fid>')
+@app.route('/admin/delete_food/<int:fid>')
 def admin_delete_food(fid):
     if not session.get('authenticated') or session.get('role') != 'admin':
         return redirect(url_for('login'))

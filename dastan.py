@@ -2375,7 +2375,23 @@ def admin_edit_food(fid):
         return f"<h1 style='color:red; text-align:center;'>کێشەیەک هەیە لە گۆڕین:</h1><p style='text-align:center; direction:ltr; font-weight:bold;'>{str(e)}</p><br><center><a href='/admin/menu_manager'>گەڕانەوە بۆ مێنیو</a></center>"
     finally: 
         if conn: conn.close()
+            @app.route('/admin/delete_food/<int:fid>')
+def admin_delete_food(fid):
+    if not session.get('authenticated') or session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM nse WHERE id = %s", (fid,))
+        conn.commit()
+    except Exception as e:
+        print("Delete food error:", e)
+    finally:
+        if conn:
+            conn.close()
+    return redirect(url_for('admin_menu_manager'))
 @app.route('/desktop/tables')
+
 def desktop_tables():
     if not session.get('authenticated'): return redirect(url_for('login'))
     tk = []

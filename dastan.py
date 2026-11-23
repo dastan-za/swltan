@@ -434,30 +434,30 @@ WEB_MASRWF_TEMPLATE = COMMON_HEAD + """
     </header>
     <div class="layout">
         <div class="table-area">
-            <div class="filter-bar" style="flex-wrap: wrap; justify-content: space-between;">
-                <form method="GET" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                    <input type="date" name="from_date" value="{{ from_date }}" class="date-input">
-                    <input type="date" name="to_date" value="{{ to_date }}" class="date-input">
+            <div class="filter-bar" style="flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 14px;">
+                <form method="GET" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <input type="date" name="from_date" value="{{ from_date }}" class="date-input" style="padding:6px 8px; font-size:12px;">
+                    <input type="date" name="to_date" value="{{ to_date }}" class="date-input" style="padding:6px 8px; font-size:12px;">
                     
-                    <select name="place" class="date-input" onchange="this.form.submit()" style="min-width:160px; cursor:pointer;">
+                    <select name="place" class="date-input" onchange="this.form.submit()" style="min-width:140px; padding:6px 8px; font-size:12px; cursor:pointer;">
                         <option value="all">هەموو شوێنەکان</option>
                         {% for s in existing_spenders %}
                         <option value="{{ s }}" {{ 'selected' if selected_place == s else '' }}>{{ s }}</option>
                         {% endfor %}
                     </select>
 
-                    <button type="submit" style="padding:8px 16px; background:var(--accent); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">گەڕان</button>
+                    <button type="submit" style="padding:6px 14px; background:var(--accent); color:#000; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer;">گەڕان</button>
                 </form>
 
-                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; font-weight:bold;">
-                    <span style="background:rgba(16,185,129,0.15); color:var(--accent); padding:6px 12px; border-radius:8px; border:1px solid var(--accent);">
+                <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:11px; font-weight:bold;">
+                    <span style="background:rgba(16,185,129,0.15); color:var(--accent); padding:4px 8px; border-radius:6px; border:1px solid var(--accent);">
                         کۆی نەغد: {{ "{:,.0f}".format(total_cash) }}
                     </span>
-                    <span style="background:rgba(239,68,68,0.15); color:var(--danger); padding:6px 12px; border-radius:8px; border:1px solid var(--danger);">
+                    <span style="background:rgba(239,68,68,0.15); color:var(--danger); padding:4px 8px; border-radius:6px; border:1px solid var(--danger);">
                         کۆی قەرز: {{ "{:,.0f}".format(total_debt) }}
                     </span>
-                    <span style="background:rgba(245,158,11,0.15); color:var(--primary); padding:6px 12px; border-radius:8px; border:1px solid var(--primary);">
-                        کۆی گشتی: {{ "{:,.0f}".format(total_all) }}
+                    <span style="background:rgba(245,158,11,0.15); color:var(--primary); padding:4px 8px; border-radius:6px; border:1px solid var(--primary);">
+                        کۆی ماوە: {{ "{:,.0f}".format(remaining_debt) }}
                     </span>
                 </div>
             </div>
@@ -2133,6 +2133,9 @@ def admin_masrwf():
                     existing_spenders.append(place)
     except: pass
     finally: conn.close()
+
+    remaining_debt = total_debt - total_cash
+
     return render_template_string(
         WEB_MASRWF_TEMPLATE,
         rows=rows,
@@ -2144,7 +2147,7 @@ def admin_masrwf():
         selected_place=selected_place,
         total_cash=total_cash,
         total_debt=total_debt,
-        total_all=total_all
+        remaining_debt=remaining_debt
     )
 @app.route('/admin/save_masrwf', methods=['POST'])
 def admin_save_masrwf():

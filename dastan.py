@@ -434,12 +434,32 @@ WEB_MASRWF_TEMPLATE = COMMON_HEAD + """
     </header>
     <div class="layout">
         <div class="table-area">
-            <div class="filter-bar">
-                <form method="GET" style="display:flex; gap:10px;">
+            <div class="filter-bar" style="flex-wrap: wrap; justify-content: space-between;">
+                <form method="GET" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                     <input type="date" name="from_date" value="{{ from_date }}" class="date-input">
                     <input type="date" name="to_date" value="{{ to_date }}" class="date-input">
+                    
+                    <select name="place" class="date-input" onchange="this.form.submit()" style="min-width:160px; cursor:pointer;">
+                        <option value="all">هەموو شوێنەکان</option>
+                        {% for s in existing_spenders %}
+                        <option value="{{ s }}" {{ 'selected' if selected_place == s else '' }}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+
                     <button type="submit" style="padding:8px 16px; background:var(--accent); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">گەڕان</button>
                 </form>
+
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; font-weight:bold;">
+                    <span style="background:rgba(16,185,129,0.15); color:var(--accent); padding:6px 12px; border-radius:8px; border:1px solid var(--accent);">
+                        کۆی نەغد: {{ "{:,.0f}".format(total_cash) }}
+                    </span>
+                    <span style="background:rgba(239,68,68,0.15); color:var(--danger); padding:6px 12px; border-radius:8px; border:1px solid var(--danger);">
+                        کۆی قەرز: {{ "{:,.0f}".format(total_debt) }}
+                    </span>
+                    <span style="background:rgba(245,158,11,0.15); color:var(--primary); padding:6px 12px; border-radius:8px; border:1px solid var(--primary);">
+                        کۆی گشتی: {{ "{:,.0f}".format(total_all) }}
+                    </span>
+                </div>
             </div>
             <div style="overflow-y:auto; flex:1;">
                 <table id="tblMasrwf">
@@ -2047,6 +2067,7 @@ def admin_masrwf():
     if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
     from_date = request.args.get('from_date', datetime.now().replace(day=1).strftime('%Y-%m-%d'))
     to_date = request.args.get('to_date', datetime.now().strftime('%Y-%m-%d'))
+    selected_place = request.args.get('place', 'all')
 
     default_places = [
         'گۆشت فرۆشی سەلاح',
@@ -2064,18 +2085,44 @@ def admin_masrwf():
 
     rows, existing_types = [], []
     existing_spenders = list(default_places)
+    total_cash, total_debt, total_all = 0.0, 0.0, 0.0
 
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, DATE_FORMAT(masrwf_date, '%%Y/%%m/%%d') AS m_date, DATE_FORMAT(masrwf_date, '%%Y-%%m-%%d') AS m_date_raw, masrwf_type, masrwf_name, spent_by, amount, payment_type, notes FROM masrwf WHERE DATE(masrwf_date) >= %s AND DATE(masrwf_date) <= %s ORDER BY masrwf_date DESC", (from_date, to_date))
+            query = """
+                SELECT id, DATE_FORMAT(masrwf_date, '%%Y/%%m/%%d') AS m_date, 
+                       DATE_FORMAT(masrwf_date, '%%Y-%%m-%%d') AS m_date_raw, 
+                       masrwf_type, masrwf_name, spent_by, amount, payment_type, notes 
+                FROM masrwf 
+                WHERE DATE(masrwf_date) >= %s AND DATE(masrwf_date) <= %s
+            """
+            params = [from_date, to_date]
+
+            if selected_place and selected_place != 'all':
+                query += " AND spent_by = %s"
+                params.append(selected_place)
+
+            query += " ORDER BY masrwf_date DESC"
+            cur.execute(query, tuple(params))
+
             for r in cur.fetchall():
+                amt = float(r.get('amount') or 0)
+                p_type = r.get('payment_type') or 'نەغد'
+
+                total_all += amt
+                if p_type == 'قەرز':
+                    total_debt += amt
+                else:
+                    total_cash += amt
+
                 rows.append({
                     'id': r['id'], 'm_date': r['m_date'], 'm_date_raw': r['m_date_raw'],
                     'masrwf_type': r.get('masrwf_type') if r.get('masrwf_type') != 'None' else r.get('masrwf_name'),
-                    'spent_by': r.get('spent_by') or '', 'amount': float(r.get('amount') or 0),
-                    'payment_type': r.get('payment_type') or 'نەغد', 'notes': r.get('notes') or ''
+                    'spent_by': r.get('spent_by') or '', 'amount': amt,
+                    'payment_type': p_type, 'notes': r.get('notes') or ''
                 })
+
             cur.execute("SELECT DISTINCT masrwf_type FROM masrwf WHERE masrwf_type IS NOT NULL AND masrwf_type != ''")
             existing_types = [r['masrwf_type'] for r in cur.fetchall()]
 
@@ -2086,7 +2133,19 @@ def admin_masrwf():
                     existing_spenders.append(place)
     except: pass
     finally: conn.close()
-    return render_template_string(WEB_MASRWF_TEMPLATE, rows=rows, from_date=from_date, to_date=to_date, today_date=datetime.now().strftime('%Y-%m-%d'), existing_types=existing_types, existing_spenders=existing_spenders)
+    return render_template_string(
+        WEB_MASRWF_TEMPLATE,
+        rows=rows,
+        from_date=from_date,
+        to_date=to_date,
+        today_date=datetime.now().strftime('%Y-%m-%d'),
+        existing_types=existing_types,
+        existing_spenders=existing_spenders,
+        selected_place=selected_place,
+        total_cash=total_cash,
+        total_debt=total_debt,
+        total_all=total_all
+    )
 @app.route('/admin/save_masrwf', methods=['POST'])
 def admin_save_masrwf():
     conn = get_db()

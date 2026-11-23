@@ -2047,7 +2047,24 @@ def admin_masrwf():
     if not session.get('authenticated') or session.get('role') != 'admin': return redirect(url_for('login'))
     from_date = request.args.get('from_date', datetime.now().replace(day=1).strftime('%Y-%m-%d'))
     to_date = request.args.get('to_date', datetime.now().strftime('%Y-%m-%d'))
-    rows, existing_types, existing_spenders = [], [], []
+
+    default_places = [
+        'گۆشت فرۆشی سەلاح',
+        'گۆشتی فرۆشی هەڤال',
+        'بەنزینخانەی حاجیاوا',
+        'سەوزەو میوە',
+        'شرەکە سیراج',
+        'مریشک فرۆشی شوانە',
+        'کۆمپیانیە راهین',
+        'شرکە سحل',
+        'شەرکەی پێبسی',
+        'کۆمپانیەی قسمەت',
+        'ئاوی سلێمانی'
+    ]
+
+    rows, existing_types = [], []
+    existing_spenders = list(default_places)
+
     conn = get_db()
     try:
         with conn.cursor() as cur:
@@ -2061,12 +2078,15 @@ def admin_masrwf():
                 })
             cur.execute("SELECT DISTINCT masrwf_type FROM masrwf WHERE masrwf_type IS NOT NULL AND masrwf_type != ''")
             existing_types = [r['masrwf_type'] for r in cur.fetchall()]
+
             cur.execute("SELECT DISTINCT spent_by FROM masrwf WHERE spent_by IS NOT NULL AND spent_by != ''")
-            existing_spenders = [r['spent_by'] for r in cur.fetchall()]
+            for r in cur.fetchall():
+                place = str(r['spent_by']).strip()
+                if place and place not in existing_spenders:
+                    existing_spenders.append(place)
     except: pass
     finally: conn.close()
     return render_template_string(WEB_MASRWF_TEMPLATE, rows=rows, from_date=from_date, to_date=to_date, today_date=datetime.now().strftime('%Y-%m-%d'), existing_types=existing_types, existing_spenders=existing_spenders)
-
 @app.route('/admin/save_masrwf', methods=['POST'])
 def admin_save_masrwf():
     conn = get_db()

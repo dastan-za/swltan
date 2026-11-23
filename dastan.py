@@ -443,7 +443,7 @@ WEB_MASRWF_TEMPLATE = COMMON_HEAD + """
             </div>
             <div style="overflow-y:auto; flex:1;">
                 <table id="tblMasrwf">
-                    <thead><tr><th>#</th><th>بەروار</th><th>جۆر</th><th>خەرجکەر</th><th>بڕی پارە</th><th>شێواز</th></tr></thead>
+                    <thead><tr><th>#</th><th>بەروار</th><th>جۆر</th><th>شوێنی مەسروف</th><th>بڕی پارە</th><th>شێواز</th></tr></thead>
                     <tbody>
                         {% for r in rows %}
                         <tr onclick="selectRow(this, {{ r.id }}, '{{ r.m_date_raw }}', '{{ r.masrwf_type }}', '{{ r.spent_by }}', {{ r.amount }}, '{{ r.payment_type }}', '{{ r.notes }}')">
@@ -461,7 +461,7 @@ WEB_MASRWF_TEMPLATE = COMMON_HEAD + """
                 <input type="hidden" id="selected_id" name="id" value="0">
                 <div><label>بەروار:</label><input type="date" id="txt_date" name="masrwf_date" class="c-input" value="{{ today_date }}" required></div>
                 <div><label>جۆری مەسرووف:</label><input list="typeOpt" id="txt_type" name="masrwf_type" class="c-input" required><datalist id="typeOpt">{% for t in existing_types %}<option value="{{ t }}">{% endfor %}</datalist></div>
-                <div><label>خەرجکەر:</label><input list="spOpt" id="txt_spent_by" name="spent_by" class="c-input"><datalist id="spOpt">{% for s in existing_spenders %}<option value="{{ s }}">{% endfor %}</datalist></div>
+                <div><label>شوێنی مەسروف:</label><input list="spOpt" id="txt_spent_by" name="spent_by" class="c-input"><datalist id="spOpt">{% for s in existing_spenders %}<option value="{{ s }}">{% endfor %}</datalist></div>
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;"><label>بڕی پارە:</label><input type="number" id="txt_amount" name="amount" class="c-input" required></div>
                     <div style="flex:1;"><label>شێواز:</label><select id="txt_payment_type" name="payment_type" class="c-input"><option value="نەغد">نەغد</option><option value="قەرز">قەرز</option></select></div>

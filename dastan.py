@@ -467,9 +467,12 @@ WEB_MASRWF_TEMPLATE = COMMON_HEAD + """
                     <tbody>
                         {% for r in rows %}
                         <tr onclick="selectRow(this, {{ r.id }}, '{{ r.m_date_raw }}', '{{ r.masrwf_type }}', '{{ r.spent_by }}', {{ r.amount }}, '{{ r.payment_type }}', '{{ r.notes }}')">
-                            <td>{{ loop.index }}</td><td>{{ r.m_date }}</td><td style="color:var(--primary);">{{ r.masrwf_type }}</td>
-                            <td>{{ r.spent_by }}</td><td style="color:var(--danger); font-weight:bold;">{{ "{:,.0f}".format(r.amount) }}</td>
-                            <td>{{ r.payment_type }}</td>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ r.m_date }}</td>
+                            <td style="color:var(--primary);">{{ r.masrwf_type }}</td>
+                            <td>{{ r.spent_by }}</td>
+                            <td style="color:{{ '#10B981' if r.payment_type == 'نەغد' else 'var(--danger)' }}; font-weight:bold;">{{ "{:,.0f}".format(r.amount) }}</td>
+                            <td style="color:{{ '#10B981' if r.payment_type == 'نەغد' else 'var(--danger)' }}; font-weight:bold;">{{ r.payment_type }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

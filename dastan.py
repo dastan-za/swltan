@@ -2635,9 +2635,10 @@ def save_cart_order():
             if tbl.isdigit():
                 cur.execute("SELECT allow_ordering FROM table_permissions WHERE table_number = %s", (int(tbl),))
                 p_row = cur.fetchone()
-                if p_row and not p_row['allow_ordering'] and session.get('role') not in ['mobile_waiter', 'admin']:
+                user_role = session.get('role', '')
+                # لێرەدا هەموو ڕۆڵە ڕێگەپێدراوەکانمان زیاد کرد بۆ ئەوەی گارسۆنی ئایپادیش بگرێتەوە
+                if p_row and not p_row['allow_ordering'] and user_role not in ['mobile_waiter', 'admin', 'waiter', 'Waiter']:
                     return jsonify({'status': 'error', 'message': 'تەنها بۆ بینینە'})
-
             # سڕینەوەی داتای کۆنی مێزەکە و دانانەوەی سەبەتە نوێیەکە بۆ لای کاشێر
             cur.execute("DELETE FROM froshtn WHERE table_cabin = %s", (tbl,))
             for it in cart:
